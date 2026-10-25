@@ -120,3 +120,30 @@ kbd{background:#fff;color:#1a2540;border-radius:4px;padding:1px 7px;font-weight:
 #joy i{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.6)}
 #lookpad{position:absolute;right:0;top:0;width:55%;height:100%;pointer-events:auto;touch-action:none}
 @media (max-width:900px){.logo span{font-size:42px}.logo b{font-size:56px}.lobby-left{padding:20px 24px}#endTitle{font-size:54px}#endStats{grid-template-columns:repeat(2,130px)}#mini{width:130px;height:130px}#topRight{width:140px}.slot{width:50px;height:50px}#bars{width:280px}}
+
+/* ===== v2 additions ===== */
+#pickRow{display:flex;gap:6px;flex-wrap:wrap}
+.pk{width:78px;padding:2px 3px 3px;background:rgba(10,20,50,.7);border:2px solid rgba(255,255,255,.55);border-radius:5px;cursor:pointer;text-align:center;transform:skew(-4deg);transition:transform .1s}
+.pk img{width:46px;height:46px;display:block;margin:0 auto;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}.pk span{display:block;font-size:10px;font-weight:bold;letter-spacing:.5px;line-height:1.1}
+.pk:hover{transform:skew(-4deg) translateY(-2px)}.pk.sel{border-color:#ffe36a;background:rgba(120,80,0,.65);box-shadow:0 0 10px #ffd23a}
+#lvlBox{display:flex;gap:10px;align-items:center;margin-top:10px;background:rgba(10,20,50,.6);border:2px solid rgba(255,255,255,.5);padding:6px 10px;transform:skew(-4deg);max-width:340px}
+.lvlN{display:flex;flex-direction:column;align-items:center;min-width:46px;background:linear-gradient(135deg,#a43cff,#3fd0ff);border-radius:6px;padding:2px 6px}.lvlN i{font-style:normal;font-size:10px;letter-spacing:2px}.lvlN b{font-family:Impact,sans-serif;font-size:26px;line-height:1}
+.lvlR{flex:1}.lvlBar{height:10px;background:rgba(0,0,0,.5);border-radius:5px;overflow:hidden}.lvlBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#c13cff,#3fd0ff)}.lvlR span{font-size:11px;opacity:.9}
+.slot .ic.img{background-color:transparent;box-shadow:none;width:58px;height:34px;margin-left:-29px;top:3px;background-size:contain;background-repeat:no-repeat;background-position:center;filter:drop-shadow(0 0 3px currentColor);transform:skew(6deg)}
+#hideTag,#campTag{position:absolute;left:50%;transform:translateX(-50%);top:70%;background:rgba(20,70,30,.8);border:2px solid #7dff7a;padding:5px 16px;border-radius:4px;font-size:14px;font-weight:bold;display:none;white-space:nowrap}
+#campTag{top:75%;background:rgba(90,40,10,.82);border-color:#ffb040}
+#crownImg{width:170px;height:170px;margin-bottom:-30px;animation:crownfloat 2.4s ease-in-out infinite;filter:drop-shadow(0 8px 14px rgba(255,190,40,.6))}
+@keyframes crownfloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}
+#xpBox{width:min(560px,90vw);background:rgba(10,20,45,.8);border:2px solid #fff;padding:10px 14px;transform:skew(-4deg)}
+.xpHead{display:flex;justify-content:space-between;align-items:baseline;font-family:Impact,sans-serif}.xpHead b{font-size:30px;color:#7df0ff}.xpHead span{font-size:20px;color:#ffe36a;letter-spacing:2px}
+.xpBar{height:14px;background:rgba(0,0,0,.55);border-radius:7px;overflow:hidden;margin:6px 0}.xpBar i{display:block;height:100%;background:linear-gradient(90deg,#c13cff,#3fd0ff);transition:width .9s ease-out}
+.xpParts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;opacity:.9}.xpParts em{font-style:normal}
+#lvlBadge{position:absolute;right:max(24px,6vw);top:50%;transform:translateY(-50%);text-align:center;animation:badgepop .9s cubic-bezier(.2,1.6,.4,1);filter:drop-shadow(0 0 18px #c13cff) drop-shadow(0 0 28px #3fd0ff);z-index:3}
+#lvlBadge svg{display:block;margin:0 auto}.lvlUp{font-family:Impact,sans-serif;font-size:30px;letter-spacing:3px;color:#fff;text-shadow:0 0 10px #c13cff}.lvlBn{font-size:16px;font-weight:bold;letter-spacing:2px;color:#7df0ff}.lvlBn b{font-family:Impact,sans-serif;font-size:26px;color:#fff}
+@keyframes badgepop{0%{transform:translateY(-50%) scale(0) rotate(-25deg);opacity:0}100%{transform:translateY(-50%) scale(1) rotate(0);opacity:1}}
+@media (max-width:900px){#lvlBadge{position:relative;right:auto;top:auto;transform:none}#crownImg{width:110px;height:110px}}
+
+.lobby-left{overflow-y:auto;max-height:100vh}.lobby-left::-webkit-scrollbar{width:0}
+#pickRow{gap:5px}
+
+@media (max-height:780px){#crownImg{width:110px;height:110px;margin-bottom:-24px}#endTitle{font-size:70px}#endBox{gap:6px}.st{padding:5px 4px}.st b{font-size:22px}#endStats{gap:6px;margin:2px 0}#xpBox{padding:6px 12px}.xpHead b{font-size:24px}.bigbtn{margin-top:6px;font-size:34px;padding:6px 32px}#lvlBadge svg{width:90px;height:105px}.lvlUp{font-size:22px}}

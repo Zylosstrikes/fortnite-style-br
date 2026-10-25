@@ -3,9 +3,9 @@
 (function () {
 const G = window.G;
 const AI = G.AI = {};
-const WS = { ar: 10, smg: 8, shotgun: 8, sniper: 6, rocket: 5, pistol: 4 };
-const EFF = { ar: 75, smg: 42, pistol: 42, shotgun: 22, sniper: 130, rocket: 60 };
-const PREF = { ar: 28, smg: 18, pistol: 22, shotgun: 9, sniper: 60, rocket: 34 };
+const WS = { ar: 10, smg: 8, shotgun: 8, sniper: 6, rocket: 5, pistol: 4, dual: 7 };
+const EFF = { ar: 75, smg: 42, pistol: 42, dual: 40, shotgun: 22, sniper: 130, rocket: 60 };
+const PREF = { ar: 28, smg: 18, pistol: 22, dual: 20, shotgun: 9, sniper: 60, rocket: 34 };
 const yawTo = (dx, dz) => Math.atan2(-dx, -dz);
 function turn(a, y, dt, rate) { const d = G.angDiff(a.yaw, y); a.yaw += G.clamp(d, -rate * dt, rate * dt); }
 function weaponsOf(a) { const o = []; for (let i = 1; i < 6; i++) { const s = a.inv[i]; if (s && s.type === 'weapon') o.push(i); } return o; }
@@ -16,6 +16,7 @@ function lootValue(a, l) {
   const it = l.item; if (l.taken) return 0; if (l.claim && l.claim !== a.id && G.time - l.claimT < 10) return 0; const nw = weaponsOf(a).length;
   if (it.kind === 'weapon') { if (nw === 0) return 90; if (nw < 3) return 50 + it.rarity * 8; const worst = Math.min(...weaponsOf(a).map(i => ws(a.inv[i]))); return (WS[it.w] || 5) * (1 + it.rarity * 0.12) > worst * 1.3 ? 35 : 0; }
   if (it.kind === 'ammo') { const W = Object.values(G.WEAPONS); const need = weaponsOf(a).some(i => G.WEAPONS[a.inv[i].w].ammo === it.t) && a.ammo[it.t] < G.AMMO[it.t].max * 0.6; return need ? 28 : 3; }
+  if (it.kind === 'gadget') { if (it.id !== 'tnt') return 0; let f2 = 0; for (let i = 1; i < 6; i++) if (!a.inv[i]) f2++; return f2 > 1 ? 20 : 0; }
   let free = 0; for (let i = 1; i < 6; i++) if (!a.inv[i]) free++; return free > 1 ? 24 : 0;
 }
 AI.init = function (a, bus, pois) {
@@ -47,7 +48,7 @@ function walkTo(a, tx, tz, dt, sprint) {
 function inBld(a, b) { return a.x > b.x - b.w / 2 && a.x < b.x + b.w / 2 && a.z > b.z - b.d / 2 && a.z < b.z + b.d / 2; }
 function pickTarget(a) {
   const ai = a.ai; let best = null, bv = 0;
-  for (const c of G.chests) { if (c.opened) continue; const d = Math.hypot(c.x - a.x, c.z - a.z); if (d > 150) continue; if (c.bld && c.y - c.bld.base > 1) continue; if (c.claim && c.claim !== a.id && G.time - c.claimT < 10) continue; const v = 60 / (20 + d); if (v > bv) { bv = v; best = { kind: 'chest', o: c }; } }
+  for (const c of G.chests) { if (c.opened || c.falling) continue; const d = Math.hypot(c.x - a.x, c.z - a.z); if (d > 150) continue; if (c.bld && c.y - c.bld.base > 1) continue; if (c.claim && c.claim !== a.id && G.time - c.claimT < 10) continue; const v = 60 / (20 + d); if (v > bv) { bv = v; best = { kind: 'chest', o: c }; } }
   for (const l of G.loot) { if (l.taken) continue; const d = Math.hypot(l.x - a.x, l.z - a.z); if (d > 130) continue; if (l.bld && l.y - l.bld.base > 1) continue; const val = lootValue(a, l); if (val <= 0) continue; const v = val / (20 + d); if (v > bv) { bv = v; best = { kind: 'loot', o: l }; } }
   if (!best) return false; best.o.claim = a.id; best.o.claimT = G.time; ai.target = best; ai.path = []; const o = best.o;
   if (o.bld && !inBld(a, o.bld) && o.bld.doorOut) ai.path = [o.bld.doorOut, o.bld.doorIn];
@@ -55,7 +56,7 @@ function pickTarget(a) {
 }
 function equipBest(a, dist) {
   let best = -1, bs = -99; for (const i of weaponsOf(a)) { const s = a.inv[i], W = G.WEAPONS[s.w]; if (s.mag <= 0 && a.ammo[W.ammo] <= 0) continue; let sc;
-    if (dist < 12) sc = { shotgun: 10, smg: 8, ar: 6, pistol: 5, rocket: 2, sniper: 1 }[s.w]; else if (dist < 40) sc = { ar: 10, smg: 8, pistol: 5, shotgun: 4, rocket: dist > 18 ? 6 : 2, sniper: 5 }[s.w]; else sc = { sniper: 10, ar: 9, smg: 4, pistol: 3, rocket: 5, shotgun: 1 }[s.w];
+    if (dist < 12) sc = { shotgun: 10, smg: 8, ar: 6, pistol: 5, dual: 7, rocket: 2, sniper: 1 }[s.w]; else if (dist < 40) sc = { ar: 10, smg: 8, pistol: 5, dual: 6, shotgun: 4, rocket: dist > 18 ? 6 : 2, sniper: 5 }[s.w]; else sc = { sniper: 10, ar: 9, smg: 4, pistol: 3, dual: 3, rocket: 5, shotgun: 1 }[s.w];
     sc *= 1 + s.rarity * 0.1; if (s.mag === 0) sc -= 2; if (sc > bs) { bs = sc; best = i; } }
   if (best >= 0 && best !== a.sel && !a.action) { a.sel = best; a.reloading = 0; G.updateHeld(a); }
   return best;
@@ -63,6 +64,7 @@ function equipBest(a, dist) {
 function senseEnemy(a) {
   const ai = a.ai; let best = null, bd = 1e9; const cur = a.inv[a.sel]; const range = cur && cur.type === 'weapon' && cur.w === 'sniper' ? 130 : 80;
   for (const t of G.actors) { if (t === a || !t.alive || t.state === 'bus') continue; const d = Math.hypot(t.x - a.x, t.z - a.z); if (d > range || d > bd) continue; if (Math.abs(t.y - a.y) > 60) continue;
+    if (t.hidden && d > (G.time - (t.lastShotT || -99) < 4 ? 14 : 5.5)) continue; // hiding in a bush: only spotted up close
     if (!G.World.los(a.x, a.y + 1.5, a.z, t.x, t.y + 1.3, t.z)) continue; bd = d; best = t; }
   if (best) { if (ai.enemy !== best) { ai.react = G.rand(0.35, 1.1) * (1.3 - ai.skill); ai.enemy = best; } ai.lastSeen = G.time; ai.los = true; ai.ex = best.x; ai.ez = best.z; }
   else { ai.los = false; if (ai.enemy && (!ai.enemy.alive || G.time - ai.lastSeen > 4)) ai.enemy = null; }
@@ -100,6 +102,8 @@ AI.update = function (a, dt) {
   // not fighting
   ai.mode = 'idle'; const hurtHp = a.hp < 65, hurtSh = a.shield < 40 && a.hp > 50;
   if ((hurtHp || hurtSh) && G.time - a.lastHitT > 3) { const slot = healSlot(a, hurtHp); if (slot > 0) { a.sel = slot; G.updateHeld(a); if (G.startHeal(a)) return; } }
+  if (a.hp < 70 && !a.camp && G.Extras && G.time - a.lastHitT > 4) { let bc = null, bd2 = 70 * 70; for (const c of G.Extras.camps) { const d2 = (c.x - a.x) ** 2 + (c.z - a.z) ** 2; if (d2 < bd2) { bd2 = d2; bc = c; } } if (bc && healSlot(a, true) < 0) { walkTo(a, bc.x + 1.5, bc.z, dt, false); ai.mode = 'camp'; return; } }
+  if (a.camp && a.hp < 95 && !ai.enemy) { a.input.f = 0; return; }
   const cur = a.inv[a.sel]; if (cur && cur.type === 'weapon' && cur.mag < G.WEAPONS[cur.w].mag * 0.5 && a.ammo[G.WEAPONS[cur.w].ammo] > 0 && !a.reloading) G.startReload(a);
   if (!cur || cur.type !== 'weapon') { const i = weaponsOf(a)[0]; if (i && !ai.harvest) equipBest(a, 30); }
   // loot
@@ -145,6 +149,8 @@ function fight(a, dt, e) {
   if (!ai.los) { inp.f = 1; inp.s = 0; }
   // build cover
   if (ai.buildCD <= 0 && ai.los && a.mats.wood >= 10 && G.time - a.lastHitT < 2.2 && dist > 5 && !a.vehicle) { if (e.y - a.y > 2.6 && a.mats.wood >= 30) { a.mats.wood -= 0; tryBuild(a, 'ramp'); ai.buildCD = 1.0; inp.f = 1; } else { tryBuild(a, 'wall'); ai.buildCD = G.rand(2.5, 5); } }
+  // throw dynamite at mid range
+  if (ai.los && ai.react <= 0.2 && dist > 9 && dist < 28 && G.time > (ai.tntT || 0)) { let ti = -1; for (let i = 1; i < 6; i++) { const s = a.inv[i]; if (s && s.type === 'gadget' && s.id === 'tnt') ti = i; } if (ti > 0 && Math.random() < 0.5) { const keep = a.sel; ai.tntT = G.time + G.rand(5, 9); a.sel = ti; G.updateHeld(a); a.fireCD = 0; G.useGadget(a, e.x, e.y + 0.3, e.z); if (a.inv[keep]) { a.sel = keep; } else a.sel = 0; G.updateHeld(a); } else ai.tntT = G.time + 3; }
   // shoot
   if (ai.los && ai.react <= 0 && dist < eff * 1.05) {
     if (cur.mag <= 0) { G.startReload(a); } else {
@@ -161,7 +167,7 @@ function tryBuild(a, type) { if (a.placeCD > 0) return false; const sp = G.Build
 G.spawnBots = function (n) {
   const names = G.BOT_NAMES.slice().sort(() => Math.random() - 0.5); const hats = ['cap', 'helmet', 'mohawk', 'horns', 'beanie', 'band'];
   for (let i = 0; i < n; i++) {
-    const cols = G.SKIN_COLORS; const skin = { shirt: G.pick(cols), pants: G.pick([0x2b3a55, 0x3a2b55, 0x2b5540, 0x554a2b, 0x40414a]), acc: G.pick(cols), hat: G.pick(hats), tone: G.pick([0xf2c9a0, 0xd9a577, 0xa87650, 0x7b5236, 0xffe0c4]) };
+    const cols = G.SKIN_COLORS; const skin = { shirt: G.pick(cols), pants: G.pick([0x2b3a55, 0x3a2b55, 0x2b5540, 0x554a2b, 0x40414a]), acc: G.pick(cols), hat: G.pick(hats), tone: G.pick([0xf2c9a0, 0xd9a577, 0xa87650, 0x7b5236, 0xffe0c4]), pick: G.pick(G.PICKAXES).id };
     const a = G.createActor(names[i % names.length], false, skin); a.stats.born = 0; G.AI.init(a, G.bus, G.POIS); a.rig.root.visible = false;
   }
 };

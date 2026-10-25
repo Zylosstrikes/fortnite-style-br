@@ -57,13 +57,13 @@ G.curItem = a => a.inv[a.sel];
 G.aliveCount = () => G.actors.reduce((n, a) => n + (a.alive ? 1 : 0), 0);
 G.updateHeld = function (a) {
   const it = a.inv[a.sel]; const r = a.rig;
-  if (a.buildMode || !it || it.type === 'heal') r.setHeld('none'); else if (it.type === 'pickaxe') r.setHeld('pickaxe'); else r.setHeld('weapon', it.w, it.rarity);
+  if (a.buildMode || !it || it.type === 'heal') r.setHeld('none'); else if (it.type === 'pickaxe') r.setHeld('pickaxe'); else if (it.type === 'gadget') r.setHeld('gadget', it.id); else r.setHeld('weapon', it.w, it.rarity);
 };
 G.selectSlot = function (a, i) {
   if (!a.alive || i < 0 || i > 5) return; if (a.inv[i] === null && i !== a.sel) return;
   if (a.action) a.action = null; a.reloading = 0; a.sel = i; a.buildMode = false; G.updateHeld(a); if (a.isPlayer) G.Audio.play('click', 0.6);
 };
-function itemOf(s) { return !s ? null : s.type === 'weapon' ? { kind: 'weapon', w: s.w, rarity: s.rarity } : s.type === 'heal' ? { kind: 'heal', id: s.id, n: s.n } : null; }
+function itemOf(s) { return !s ? null : s.type === 'weapon' ? { kind: 'weapon', w: s.w, rarity: s.rarity } : s.type === 'heal' ? { kind: 'heal', id: s.id, n: s.n } : s.type === 'gadget' ? { kind: 'gadget', id: s.id, n: s.n } : null; }
 G.dropAt = function (item, x, y, z, spread) { const ang = Math.random() * 6.28, r = spread === undefined ? G.rand(0.8, 1.6) : spread; const lx = x + Math.cos(ang) * r, lz = z + Math.sin(ang) * r; return G.addLoot(item, lx, Math.max(y, G.World.heightAt(lx, lz) + 0.1), lz); };
 G.giveItem = function (a, item) {
   if (item.kind === 'ammo') { const m = G.AMMO[item.t].max, take = Math.min(item.n, m - a.ammo[item.t]); if (take <= 0) return { ok: false, rem: item.n }; a.ammo[item.t] += take; return { ok: true, rem: item.n - take }; }
@@ -75,10 +75,10 @@ G.giveItem = function (a, item) {
     if (a.isBot) { const W_ = G.WEAPONS[item.w]; a.ammo[W_.ammo] = Math.min(G.AMMO[W_.ammo].max, a.ammo[W_.ammo] + Math.ceil(G.AMMO[W_.ammo].pick * 0.7)); }
     return { ok: true, rem: 0 };
   }
-  if (item.kind === 'heal') {
-    const st = G.HEALS[item.id].stack; let n = item.n;
-    for (let i = 1; i < 6 && n > 0; i++) { const s = a.inv[i]; if (s && s.type === 'heal' && s.id === item.id && s.n < st) { const t = Math.min(n, st - s.n); s.n += t; n -= t; } }
-    for (let i = 1; i < 6 && n > 0; i++) if (!a.inv[i]) { const t = Math.min(n, st); a.inv[i] = { type: 'heal', id: item.id, n: t }; n -= t; }
+  if (item.kind === 'heal' || item.kind === 'gadget') {
+    const ty = item.kind, st = (ty === 'heal' ? G.HEALS : G.GADGETS)[item.id].stack; let n = item.n;
+    for (let i = 1; i < 6 && n > 0; i++) { const s = a.inv[i]; if (s && s.type === ty && s.id === item.id && s.n < st) { const t = Math.min(n, st - s.n); s.n += t; n -= t; } }
+    for (let i = 1; i < 6 && n > 0; i++) if (!a.inv[i]) { const t = Math.min(n, st); a.inv[i] = { type: ty, id: item.id, n: t }; n -= t; }
     return { ok: n < item.n, rem: n };
   }
   return { ok: false, rem: 1 };
@@ -90,8 +90,8 @@ G.pickupLoot = function (a, l) {
   if (a.isPlayer) { G.Audio.play('pickup'); G.hook('pickup', it); } else G.Audio.at('step', l.x, l.y, l.z, 0.5);
   return true;
 };
-G.itemName = function (it) { return it.kind === 'weapon' ? G.RARITY[it.rarity].name + ' ' + G.WEAPONS[it.w].name : it.kind === 'ammo' ? G.AMMO[it.t].name + ' x' + it.n : G.HEALS[it.id].name + (it.n > 1 ? ' x' + it.n : ''); };
-G.itemColor = function (it) { return it.kind === 'weapon' ? G.RARITY[it.rarity].hex : it.kind === 'ammo' ? G.AMMO[it.t].hex : G.HEALS[it.id].hex; };
+G.itemName = function (it) { return it.kind === 'weapon' ? G.RARITY[it.rarity].name + ' ' + G.WEAPONS[it.w].name : it.kind === 'ammo' ? G.AMMO[it.t].name + ' x' + it.n : it.kind === 'gadget' ? G.GADGETS[it.id].name + (it.n > 1 ? ' x' + it.n : '') : G.HEALS[it.id].name + (it.n > 1 ? ' x' + it.n : ''); };
+G.itemColor = function (it) { return it.kind === 'weapon' ? G.RARITY[it.rarity].hex : it.kind === 'ammo' ? G.AMMO[it.t].hex : it.kind === 'gadget' ? G.GADGETS[it.id].hex : G.HEALS[it.id].hex; };
 const _lootAmmoT = [0];
 G.autoAmmo = function (a) {
   const L = G.loot; for (let i = 0; i < L.length; i++) { const l = L[i]; if (l.taken || l.item.kind !== 'ammo') continue; const dx = l.x - a.x, dz = l.z - a.z; if (dx * dx + dz * dz < 2.2 && Math.abs(l.y - a.y) < 2.5) G.pickupLoot(a, l); }
@@ -158,7 +158,7 @@ G.tryFire = function (a, tx, ty, tz) {
   const it = a.inv[a.sel]; if (!it || it.type !== 'weapon') return false; if (a.fireCD > 0 || a.reloading > 0 || a.action || a.state !== 'ground' || a.vehicle) return false;
   const Wp = G.WEAPONS[it.w], R = G.RARITY[it.rarity];
   if (it.mag <= 0) { a.fireCD = 0.3; if (a.ammo[Wp.ammo] > 0) G.startReload(a); else if (a.isPlayer) { G.Audio.play('empty'); G.hook('msg', 'Out of ' + G.AMMO[Wp.ammo].name.toLowerCase()); } return false; }
-  it.mag--; a.fireCD = 1 / (Wp.rate * (1 + 0.025 * it.rarity)); a.stats.shots++;
+  it.mag--; a.fireCD = 1 / (Wp.rate * (1 + 0.025 * it.rarity)); a.stats.shots++; a.lastShotT = G.time;
   const m = G.muzzle(a, _mz); let dx = tx - m.x, dy = ty - m.y, dz = tz - m.z; const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
   const mv = Math.min(1, a.speedNow / 7), spread = Wp.spread * (1 + a.bloom * 1.2) * (1 + mv * 0.9) * (a.input.ads ? 0.55 : 1) * (a.isBot ? (a.ai ? a.ai.spreadMul : 1) : 1);
   a.bloom = Math.min(1, a.bloom + 0.12); a.rig.flash.visible = true; a.flashT = 0.05; a.recoil = (a.recoil || 0) + (Wp.rocket ? 0.1 : it.w === 'sniper' ? 0.09 : it.w === 'shotgun' ? 0.07 : 0.018);
@@ -181,14 +181,14 @@ G.tryFire = function (a, tx, ty, tz) {
   return true;
 };
 function FXtrace(a, m, px, py, pz, it) { FX.tracer(m.x, m.y - 0.05, m.z, px, py, pz, it.w === 'sniper' ? 0x9ad8ff : 0xfff2a8); }
-G.makeRocketMesh = function () { const g = new T.Group(); const c = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.7, 8), G.mat(0xdddddd)); c.rotation.x = Math.PI / 2; g.add(c); const t = new T.Mesh(new T.ConeGeometry(0.1, 0.25, 8), G.mat(0xff4d4d)); t.rotation.x = -Math.PI / 2; t.position.z = -0.47; g.add(t); const f = new T.Mesh(new T.SphereGeometry(0.16, 6, 5), new T.MeshBasicMaterial({ color: 0xffa83a })); f.position.z = 0.45; g.add(f); return g; };
+G.makeRocketMesh = function () { const g = new T.Group(); const c = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.7, 8), G.mat(0xff8a2a)); c.rotation.x = Math.PI / 2; g.add(c); const t = new T.Mesh(new T.ConeGeometry(0.1, 0.25, 8), G.mat(0xff4d4d)); t.rotation.x = -Math.PI / 2; t.position.z = -0.47; g.add(t); const f = new T.Mesh(new T.SphereGeometry(0.16, 6, 5), new T.MeshBasicMaterial({ color: 0xffa83a })); f.position.z = 0.45; g.add(f); return g; };
 G.damageBox = function (b, dmg, att) {
   if (b.dead) return; if (b.piece) { G.damagePiece(b.piece, dmg); return; } if (!b.destructible) return; b.hp -= dmg;
   if (b.hp <= 0) { G.Audio.at('break', (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2); FX.debris((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2, b.col || 0xcccccc, 12); G.World.destroyBox(b); }
 };
-G.explode = function (x, y, z, R, dmg, owner) {
+G.explode = function (x, y, z, R, dmg, owner, wname) {
   FX.explosion(x, y, z, R); G.Audio.at('explosion', x, y, z); const dx = G.cam ? G.cam.position.x - x : 99, dz = G.cam ? G.cam.position.z - z : 99; if (dx * dx + dz * dz < 2500) FX.shake = Math.max(FX.shake, 0.8);
-  for (const a of G.actors) { if (!a.alive || a.state === 'bus') continue; const d = Math.hypot(a.x - x, a.y + 1 - y, a.z - z); if (d < R + 0.6) { let k = 1 - d / (R * 1.15); let dd = dmg * k * (a === owner ? 0.5 : 1); if (dd > 1) G.damageActor(a, dd, owner, false, 'Rocket'); a.vy += 6 * k; a.vx += (a.x - x) / (d + 0.5) * 6 * k; a.vz += (a.z - z) / (d + 0.5) * 6 * k; } }
+  for (const a of G.actors) { if (!a.alive || a.state === 'bus') continue; const d = Math.hypot(a.x - x, a.y + 1 - y, a.z - z); if (d < R + 0.6) { let k = 1 - d / (R * 1.15); let dd = dmg * k * (a === owner ? 0.5 : 1); if (dd > 1) G.damageActor(a, dd, owner, false, wname || 'Rocket'); a.vy += 6 * k; a.vx += (a.x - x) / (d + 0.5) * 6 * k; a.vz += (a.z - z) / (d + 0.5) * 6 * k; } }
   const list = []; G.World.forBoxes(x - R, z - R, x + R, z + R, b => { if (b.destructible || b.piece) list.push(b); });
   for (const b of list) { const px = G.clamp(x, b.x0, b.x1), py = G.clamp(y, b.y0, b.y1), pz = G.clamp(z, b.z0, b.z1); const d = Math.hypot(px - x, py - y, pz - z); if (d < R) G.damageBox(b, 420 * (1 - d / R * 0.6), owner); }
 };
@@ -362,13 +362,15 @@ G.updateActor = function (a, dt) {
     const tvy = gl ? -9 : (inp.f > 0 ? -58 : -48) + (inp.f < 0 ? 12 : 0); a.vy += (tvy - a.vy) * Math.min(1, dt * (gl ? 2.5 : 1.2));
     a.x += a.vx * dt; a.z += a.vz * dt; a.y += a.vy * dt; const r2 = Math.hypot(a.x, a.z); if (r2 > 520) { a.x *= 520 / r2; a.z *= 520 / r2; }
     const g = G.World.groundY(a.x, a.z, a.y, 0.6); a.onGround = false; a.speedNow = Math.hypot(a.vx, a.vz);
-    if (a.y <= g + 0.05) { a.y = g; a.state = 'ground'; a.vy = 0; a.glideOpen = false; r.glider.visible = false; r.lean.rotation.x = 0; a.vx *= 0.3; a.vz *= 0.3; G.Audio.at('step', a.x, a.y, a.z, 1); a.onGround = true; G.hook('landed', a); }
+    if (a.y <= g + 0.05) { a.y = g; a.state = 'ground'; a.vy = 0; a.glideOpen = false; a.autoGlide = false; r.glider.visible = false; r.lean.rotation.x = 0; a.vx *= 0.3; a.vz *= 0.3; G.Audio.at('step', a.x, a.y, a.z, 1); a.onGround = true; G.hook('landed', a); }
     else if (a.state === 'freefall' && (a.openNow || (a.isBot && a.y - g < a.openAlt)) && a.y - g > 6) { openGlider(a); }
     else if (a.state === 'freefall' && a.y - g < 70 && a.isPlayer) openGlider(a);
     a.stats.dist += Math.hypot(a.x - px, a.z - pz); animate(a, dt); return;
   }
   if (a.vehicle) { animate(a, dt); return; }
   // ground
+  if (a.autoGlide && !a.onGround && a.vy < -2) { const gg = G.World.groundY(a.x, a.z, a.y, 0.6); if (a.y - gg > 4) { a.autoGlide = false; openGlider(a); animate(a, dt); return; } }
+  if (a.autoGlide && a.onGround && a.vy <= 0 && G.time - (a.launchedAt || 0) > 0.3) a.autoGlide = false;
   if (a.reloading > 0) { a.reloading -= dt; if (a.reloading <= 0) { const it = a.inv[a.sel]; if (it && it.type === 'weapon') { const Wp = G.WEAPONS[it.w]; const need = Wp.mag - it.mag, take = Math.min(need, a.ammo[Wp.ammo]); it.mag += take; a.ammo[Wp.ammo] -= take; } } }
   if (a.action) {
     const ac = a.action; const h = G.HEALS[ac.id]; ac.t += dt; const k = Math.min(1, ac.t / ac.dur);
@@ -410,7 +412,7 @@ function animate(a, dt) {
   }
   if (r.held) r.held.visible = true;
   if (a.buildMode) { A[0].rotation.set(1.2, 0, 0.1); A[1].rotation.set(1.2, 0, -0.1); return; }
-  if (it && it.type === 'weapon') { const up = 1.45 + a.pitch * 0.8; A[1].rotation.set(up, 0, -0.12); A[0].rotation.set(up + 0.08, 0, 0.45); }
+  if (it && (it.type === 'weapon' || it.type === 'gadget')) { const up = 1.45 + a.pitch * 0.8; A[1].rotation.set(up, 0, -0.12); A[0].rotation.set(up + 0.08, 0, 0.45); }
   else if (it && it.type === 'pickaxe') { const k = a.swing > 0 ? Math.min(1, a.swing / 0.35) : 0; A[1].rotation.x = a.swing > 0 ? (k < 0.4 ? 2.9 - k * 1.0 : 2.5 - (k - 0.4) / 0.6 * 1.9) : 0.35 - sw * 0.5; A[0].rotation.x = -sw * 0.8; r.pick.visible = true; }
   else if (a.action) { A[0].rotation.set(2.0, 0, 0.5); A[1].rotation.set(2.0 + Math.sin(a.action.t * 8) * 0.15, 0, -0.5); }
   else { A[0].rotation.x = -sw * 0.8; A[1].rotation.x = sw * 0.8; }
@@ -421,5 +423,5 @@ G.animateRig = animate;
 G.updateVehicles = function (dt) { for (const v of G.vehicles) updateVehicle(v, dt); };
 G.nearestVehicle = function (a, r) { let b = null, bd = r * r; for (const v of G.vehicles) { if (v.driver) continue; const d = (v.x - a.x) ** 2 + (v.z - a.z) ** 2; if (d < bd) { bd = d; b = v; } } return b; };
 G.nearestLoot = function (a, r) { let b = null, bd = r * r; const L = G.loot; for (let i = 0; i < L.length; i++) { const l = L[i]; if (l.taken || l.item.kind === 'ammo') continue; const dx = l.x - a.x, dz = l.z - a.z, dy = l.y - a.y; if (Math.abs(dy) > 3) continue; const d = dx * dx + dz * dz; if (d < bd) { bd = d; b = l; } } return b; };
-G.nearestChest = function (a, r) { let b = null, bd = r * r; for (const c of G.chests) { if (c.opened) continue; const dx = c.x - a.x, dz = c.z - a.z; if (Math.abs(c.y - a.y) > 3) continue; const d = dx * dx + dz * dz; if (d < bd) { bd = d; b = c; } } return b; };
+G.nearestChest = function (a, r) { let b = null, bd = r * r; for (const c of G.chests) { if (c.opened || c.falling) continue; const dx = c.x - a.x, dz = c.z - a.z; if (Math.abs(c.y - a.y) > 3) continue; const d = dx * dx + dz * dz; if (d < bd) { bd = d; b = c; } } return b; };
 })();

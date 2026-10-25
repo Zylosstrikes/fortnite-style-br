@@ -2,10 +2,12 @@
 /* HUD, minimap, big map, screens */
 (function () {
 const G = window.G; const $ = id => document.getElementById(id);
-const UI = G.UI = { skinColor: G.SKIN_COLORS[5] };
+const UI = G.UI = { skinColor: G.SKIN_COLORS[5], pick: (function () { try { const p = localStorage.getItem('sf_pick'); if (G.PICKAXES.some(x => x.id === p)) return p; } catch (e) { } return 'pick'; })() };
 let toastT = 0, sigs = {};
 UI.init = function () {
   const sw = $('swatches'); G.SKIN_COLORS.forEach((c, i) => { const d = document.createElement('div'); d.className = 'sw' + (i === 5 ? ' sel' : ''); d.style.background = '#' + c.toString(16).padStart(6, '0'); d.onclick = () => { UI.skinColor = c; [...sw.children].forEach(x => x.classList.remove('sel')); d.classList.add('sel'); G.Audio.init(); G.Audio.play('click'); }; sw.appendChild(d); });
+  const pr = $('pickRow'); G.PICKAXES.forEach(px => { const d = document.createElement('div'); d.className = 'pk' + (px.id === UI.pick ? ' sel' : ''); d.dataset.id = px.id; const url = G.itemIconURL({ type: 'pickaxe', pick: px.id }); d.innerHTML = (url ? '<img src="' + url + '">' : '') + '<span>' + px.name + '</span>'; d.onclick = () => { UI.pick = px.id; try { localStorage.setItem('sf_pick', px.id); } catch (e) { } [...pr.children].forEach(x => x.classList.toggle('sel', x === d)); G.Audio.init(); G.Audio.play('click'); }; pr.appendChild(d); });
+  UI.refreshLevel();
   const hb = $('hotbar'); for (let i = 0; i < 6; i++) { const d = document.createElement('div'); d.className = 'slot empty'; d.innerHTML = '<span class="k">' + (i + 1) + '</span>'; d.onclick = () => { if (G.player) G.selectSlot(G.player, i); }; hb.appendChild(d); }
   const bb = $('buildbar'); bb.innerHTML = ['wall|Q', 'floor|F', 'ramp|Z', 'roof|C'].map(s => { const [n, k] = s.split('|'); return '<div class="bslot" data-t="' + n + '"><b>' + k + '</b><span>' + n.toUpperCase() + '</span></div>'; }).join('') + ['wood', 'stone', 'metal'].map(m => '<div class="bmat" data-m="' + m + '"><b>0</b><span>' + m.toUpperCase() + ' (G)</span></div>').join('');
   const mb = $('matsBox'); mb.innerHTML = ['wood', 'stone', 'metal'].map(m => '<div class="mat" data-m="' + m + '" style="border-color:' + G.MATS[m].css + '">' + G.MATS[m].name + ' <b>0</b></div>').join('');
@@ -23,6 +25,7 @@ UI.init = function () {
   };
   $('hitmark').className = '';
 };
+UI.refreshLevel = function () { const l = G.levelFromXp(G.loadXp()); $('lvlNum').textContent = l.level; $('lvlTxt').textContent = l.into + ' / ' + l.need + ' XP'; $('lvlFill').style.width = (l.into / l.need * 100) + '%'; };
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 UI.toast = function (t, ms, small) { const e = $('toast'); e.textContent = t; e.style.fontSize = small ? '20px' : '30px'; e.style.top = small ? '20%' : '16%'; e.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('on'), ms || 2200); };
 function setHTML(el, key, html) { if (sigs[key] !== html) { sigs[key] = html; el.innerHTML = html; } }
@@ -39,8 +42,9 @@ UI.update = function (dt) {
     if (sigs['s' + i] === sig) continue; sigs['s' + i] = sig; el.className = 'slot' + (s ? '' : ' empty') + (p.sel === i && !p.buildMode ? ' sel' : '');
     let inner = '<span class="k">' + (i + 1) + '</span>';
     if (s) { let col = '#fff', nm = '', c = '';
-      if (s.type === 'pickaxe') { nm = 'Pickaxe'; col = '#ff9a3a'; } else if (s.type === 'weapon') { nm = G.WEAPONS[s.w].short; col = G.RARITY[s.rarity].color; c = s.mag; } else { nm = G.HEALS[s.id].name; col = G.HEALS[s.id].color; c = s.n; }
-      el.style.borderColor = col; inner += '<span class="ic" style="background:' + col + ';color:' + col + '"></span><span class="n">' + nm + '</span><span class="c">' + c + '</span>'; } else el.style.borderColor = '';
+      if (s.type === 'pickaxe') { nm = G.PICKAXES.find(x => x.id === (p.skin && p.skin.pick)) ? G.PICKAXES.find(x => x.id === p.skin.pick).name.split(' ')[1] || 'Pickaxe' : 'Pickaxe'; col = '#ff9a3a'; } else if (s.type === 'weapon') { nm = G.WEAPONS[s.w].short; col = G.RARITY[s.rarity].color; c = s.mag; } else if (s.type === 'gadget') { nm = G.GADGETS[s.id].short; col = G.GADGETS[s.id].color; c = s.n; } else { nm = G.HEALS[s.id].name.replace(' Potion', '').replace('Small Shield', 'Mini Shield'); col = G.HEALS[s.id].color; c = s.n; }
+      const url = G.itemIconURL(s.type === 'pickaxe' ? { type: 'pickaxe', pick: p.skin && p.skin.pick } : s);
+      el.style.borderColor = col; inner += (url ? '<span class="ic img" style="background-image:url(' + url + ');color:' + col + '"></span>' : '<span class="ic" style="background:' + col + ';color:' + col + '"></span>') + '<span class="n">' + nm + '</span><span class="c">' + c + '</span>'; } else el.style.borderColor = '';
     el.innerHTML = inner;
   }
   // build bar / mats
@@ -51,7 +55,8 @@ UI.update = function (dt) {
   // ammo
   const it = p.inv[p.sel]; let main = '', res = '';
   if (!p.buildMode && it && it.type === 'weapon') { const W = G.WEAPONS[it.w]; main = it.mag + ' <small>/ ' + p.ammo[W.ammo] + '</small>'; res = G.RARITY[it.rarity].name + ' ' + W.name + (p.reloading > 0 ? ' — RELOADING' : ''); $('ammoRes').style.color = G.RARITY[it.rarity].color; }
-  else if (it && it.type === 'heal' && !p.buildMode) { main = it.n; res = G.HEALS[it.id].name; $('ammoRes').style.color = G.HEALS[it.id].color; } else { $('ammoRes').style.color = '#fff'; res = p.buildMode ? 'Building — ' + p.buildType.toUpperCase() + ' (' + G.MATS[p.buildMat].name + ')' : ''; }
+  else if (it && it.type === 'heal' && !p.buildMode) { main = it.n; res = G.HEALS[it.id].name; $('ammoRes').style.color = G.HEALS[it.id].color; }
+  else if (it && it.type === 'gadget' && !p.buildMode) { main = it.n; res = G.GADGETS[it.id].name + (it.id === 'tnt' ? ' — LMB to throw' : ' — LMB to place'); $('ammoRes').style.color = G.GADGETS[it.id].color; } else { $('ammoRes').style.color = '#fff'; res = p.buildMode ? 'Building — ' + p.buildType.toUpperCase() + ' (' + G.MATS[p.buildMat].name + ')' : ''; }
   setHTML($('ammoMain'), 'am', main); setHTML($('ammoRes'), 'ar', res);
   setHTML($('ammoAll'), 'aa', Object.keys(G.AMMO).map(t => '<span style="color:' + G.AMMO[t].color + '">' + G.AMMO[t].name.replace(' Bullets', '') + ' ' + p.ammo[t] + '</span>').join('<br>'));
   // action progress
@@ -63,7 +68,7 @@ UI.update = function (dt) {
     $('stormText').textContent = S.stage === 'wait' ? (S.phase === 0 ? 'Storm forming — closes in' : 'Storm shrinks in') : S.stage === 'shrink' ? 'Storm is closing' : 'Final storm'; $('stormTime').textContent = S.stage === 'done' ? '--' : mmss(S.left);
     const inStorm = Math.hypot(p.x - S.cx, p.z - S.cz) > S.r; $('stormFx').classList.toggle('on', inStorm && p.alive);
   }
-  $('scope').classList.toggle('on', !!G.scoped);
+  $('scope').classList.toggle('on', !!G.scoped); $('hideTag').style.display = p.hidden ? 'block' : 'none'; $('campTag').style.display = p.camp ? 'block' : 'none';
   $('cross').style.display = G.scoped || (G.view && G.view !== G.player) || p.state === 'bus' ? 'none' : 'block';
 };
 
@@ -80,7 +85,8 @@ UI.drawMini = function () {
     if (St.stage !== 'done') { c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.arc(wx(St.nx), wz(St.nz), St.nr * k, 0, 6.2832); c.stroke(); }
   }
   const B = G.bus; if (B && B.active) { c.strokeStyle = 'rgba(255,230,80,.8)'; c.setLineDash([6, 6]); c.lineWidth = 2; c.beginPath(); c.moveTo(wx(B.sx), wz(B.sz)); c.lineTo(wx(B.ex), wz(B.ez)); c.stroke(); c.setLineDash([]); c.fillStyle = '#ffd83a'; c.beginPath(); c.arc(wx(B.x), wz(B.z), 6, 0, 6.3); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); }
-  for (const ch of G.chests) { if (ch.opened) continue; const dx = ch.x - p.x, dz = ch.z - p.z; if (Math.abs(dx) < span / 2 - 4 && Math.abs(dz) < span / 2 - 4 && dx * dx + dz * dz < 140 * 140) { c.fillStyle = '#ffd23a'; c.fillRect(wx(ch.x) - 2, wz(ch.z) - 2, 4, 4); } }
+  for (const ch of G.chests) { if (ch.opened) continue; const dx = ch.x - p.x, dz = ch.z - p.z; const big = ch.kind === 'llama' || ch.kind === 'truck'; if (Math.abs(dx) < span / 2 - 4 && Math.abs(dz) < span / 2 - 4 && (big || dx * dx + dz * dz < 140 * 140)) { if (ch.kind === 'llama') { c.fillStyle = '#ff5fb0'; c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.beginPath(); c.arc(wx(ch.x), wz(ch.z), 6, 0, 6.3); c.fill(); c.stroke(); } else if (ch.kind === 'truck') { c.fillStyle = '#c08aff'; c.fillRect(wx(ch.x) - 4, wz(ch.z) - 4, 8, 8); } else { c.fillStyle = ch.style === 'metal' ? '#4de3ff' : '#ffd23a'; c.fillRect(wx(ch.x) - 2, wz(ch.z) - 2, 4, 4); } } }
+  if (G.Extras) { for (const q of G.Extras.camps) { const dx = q.x - p.x, dz = q.z - p.z; if (Math.abs(dx) < span / 2 - 4 && Math.abs(dz) < span / 2 - 4) { c.fillStyle = '#ff8a2a'; c.beginPath(); c.arc(wx(q.x), wz(q.z), 3, 0, 6.3); c.fill(); } } for (const q of G.Extras.rifts) { const dx = q.x - p.x, dz = q.z - p.z; if (Math.abs(dx) < span / 2 - 5 && Math.abs(dz) < span / 2 - 5) { c.fillStyle = '#b8a8ff'; c.beginPath(); c.moveTo(wx(q.x), wz(q.z) - 5); c.lineTo(wx(q.x) + 4, wz(q.z)); c.lineTo(wx(q.x), wz(q.z) + 5); c.lineTo(wx(q.x) - 4, wz(q.z)); c.fill(); } } }
   if (G.waypoint) { let x = wx(G.waypoint.x), z = wz(G.waypoint.z); x = G.clamp(x, 8, S - 8); z = G.clamp(z, 8, S - 8); c.fillStyle = '#4de3ff'; c.beginPath(); c.moveTo(x, z + 8); c.lineTo(x - 6, z - 6); c.lineTo(x + 6, z - 6); c.fill(); }
   // player
   if (p.state !== 'bus') { c.save(); c.translate(S / 2, S / 2); c.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)) + Math.PI / 2); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -9); c.lineTo(7, 8); c.lineTo(0, 4); c.lineTo(-7, 8); c.closePath(); c.fill(); c.stroke(); c.restore(); }
@@ -96,6 +102,8 @@ UI.drawBig = function () {
   for (const q of G.POIS) { c.strokeText(q.name, wx(q.x), wz(q.z) - 8); c.fillText(q.name, wx(q.x), wz(q.z) - 8); c.fillStyle = '#ffe36a'; c.beginPath(); c.arc(wx(q.x), wz(q.z), 4, 0, 6.3); c.fill(); c.fillStyle = '#fff'; }
   c.font = 'italic 13px Trebuchet MS, Arial'; c.fillStyle = '#e8f6ff'; for (const q of G.REGIONS) { c.strokeText(q.name, wx(q.x), wz(q.z)); c.fillText(q.name, wx(q.x), wz(q.z)); }
   for (const v of G.vehicles) { if (v.driver) continue; c.fillStyle = '#ff7a3a'; c.fillRect(wx(v.x) - 3, wz(v.z) - 3, 6, 6); }
+  if (G.Extras) { for (const q of G.Extras.camps) { c.fillStyle = '#ff8a2a'; c.beginPath(); c.arc(wx(q.x), wz(q.z), 4, 0, 6.3); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); } for (const q of G.Extras.rifts) { c.fillStyle = '#b8a8ff'; c.beginPath(); c.moveTo(wx(q.x), wz(q.z) - 7); c.lineTo(wx(q.x) + 5, wz(q.z)); c.lineTo(wx(q.x), wz(q.z) + 7); c.lineTo(wx(q.x) - 5, wz(q.z)); c.fill(); c.stroke(); }
+    for (const ch of G.chests) { if (ch.opened || (ch.kind !== 'llama' && ch.kind !== 'truck')) continue; c.fillStyle = ch.kind === 'llama' ? '#ff5fb0' : '#c08aff'; c.beginPath(); c.arc(wx(ch.x), wz(ch.z), ch.kind === 'llama' ? 8 : 6, 0, 6.3); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#fff'; c.font = 'bold 12px Trebuchet MS'; c.textAlign = 'center'; c.fillText(ch.kind === 'llama' ? 'LLAMA' : 'TRUCK', wx(ch.x), wz(ch.z) - 11); } }
   if (G.waypoint) { c.fillStyle = '#4de3ff'; c.beginPath(); c.moveTo(wx(G.waypoint.x), wz(G.waypoint.z) + 4); c.lineTo(wx(G.waypoint.x) - 8, wz(G.waypoint.z) - 14); c.lineTo(wx(G.waypoint.x) + 8, wz(G.waypoint.z) - 14); c.fill(); }
   if (p && p.state !== 'bus') { c.save(); c.translate(wx(p.x), wz(p.z)); c.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)) + Math.PI / 2); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, -13); c.lineTo(10, 11); c.lineTo(0, 6); c.lineTo(-10, 11); c.closePath(); c.fill(); c.stroke(); c.restore(); }
 };
@@ -109,6 +117,16 @@ UI.showEnd = function (win, pl, byName, canSpec) {
   const items = [['#' + (win ? 1 : st.placement), 'PLACEMENT'], [pl.kills, 'ELIMINATIONS'], [Math.round(st.dealt), 'DAMAGE DEALT'], [Math.round(st.taken), 'DAMAGE TAKEN'], [acc, 'ACCURACY'], [tm, 'TIME SURVIVED'], [Math.round(st.dist) + 'm', 'DISTANCE'], [st.harvested + ' / ' + st.built, 'MATS / BUILT']];
   $('endStats').innerHTML = items.map(i => '<div class="st"><b>' + i[0] + '</b><span>' + i[1] + '</span></div>').join(''); $('specBtn').style.display = canSpec ? '' : 'none';
   const cf = $('confetti'); cf.innerHTML = ''; if (win) { for (let i = 0; i < 90; i++) { const d = document.createElement('div'); d.className = 'cf'; d.style.left = Math.random() * 100 + '%'; d.style.background = ['#ffd83a', '#ff5a5a', '#3fa0ff', '#5ad65a', '#ff6bd0', '#fff'][i % 6]; d.style.animationDuration = (2.5 + Math.random() * 3) + 's'; d.style.animationDelay = Math.random() * 2 + 's'; cf.appendChild(d); } }
+  // Victory crown render + XP / level-up badge
+  const cr = $('crownImg'); if (win) { if (!UI._crownURL) UI._crownURL = G.renderIcon(G.makeCrown(), 260, 0.45, 0.4); if (UI._crownURL) { cr.src = UI._crownURL; cr.style.display = 'block'; } } else cr.style.display = 'none';
+  if (!G._xpDone) { G._xpDone = true; try { G._xpRes = G.awardXp(pl, win); } catch (err) { G._xpRes = null; } }
+  const xr = G._xpRes, xb = $('xpBox'); $('lvlBadge').classList.add('hidden');
+  if (xr) { xb.style.display = 'block';
+    const fr = o => o.into / o.need * 100; const startW = fr(xr.lb), endW = fr(xr.la);
+    xb.innerHTML = '<div class="xpHead"><b>+' + xr.gain + ' XP</b><span>LEVEL ' + xr.la.level + '</span></div><div class="xpBar"><i id="xpFill" style="width:' + startW + '%"></i></div><div class="xpParts">' + xr.parts.filter(q => q[1] > 0).map(q => '<em>' + q[0] + ' +' + q[1] + '</em>').join('') + '</div>';
+    const fill = $('xpFill'); setTimeout(() => { if (xr.levelUp) { fill.style.width = '100%'; setTimeout(() => { fill.style.transition = 'none'; fill.style.width = '0%'; requestAnimationFrame(() => { fill.style.transition = 'width .9s'; fill.style.width = endW + '%'; }); }, 1000); } else fill.style.width = endW + '%'; }, 250);
+    if (xr.levelUp) { const bd = $('lvlBadge'); $('lvlBadgeNum').textContent = xr.la.level; bd.classList.remove('hidden'); bd.style.animation = 'none'; void bd.offsetWidth; bd.style.animation = ''; setTimeout(() => G.Audio.play('levelup'), 600); }
+    UI.refreshLevel(); }
   G.Audio.play(win ? 'victory' : 'elim');
 };
 UI.hideEnd = function () { $('end').classList.add('hidden'); };

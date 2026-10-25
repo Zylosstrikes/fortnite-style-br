@@ -71,8 +71,8 @@ function updateBus(dt) {
 function startMatch() {
   if (state.phase === 'playing') return; G.Audio.init(); G.Audio.stopMusic();
   const name = ($('nameInput').value || 'Player').trim().slice(0, 14) || 'Player'; localStorage.setItem('sf_name', name);
-  const pc = UI().skinColor; const skin = { shirt: pc, pants: 0x2b3a55, acc: pc === 0xffd83a ? 0xff5a5a : 0xffd83a, hat: 'cap', tone: 0xf2c9a0 };
-  G.time = 0; const pl = G.player = G.createActor(name, true, skin); pl.stats.born = 0; G.view = pl;
+  const pc = UI().skinColor; const skin = { shirt: pc, pants: 0x2b3a55, acc: pc === 0xffd83a ? 0xff5a5a : 0xffd83a, hat: 'cap', tone: 0xf2c9a0, pick: UI().pick };
+  G.time = 0; G._xpDone = false; G.Extras.llamaT = 45; G.Extras.llamaN = 0; const pl = G.player = G.createActor(name, true, skin); pl.stats.born = 0; G.view = pl;
   startBus(); G.spawnBots(34); initStorm(); G.spawnVehicles();
   $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden'); $('busHint').style.display = 'block'; state.phase = 'playing'; state.ended = false; state.spec = null; state.matchOver = false; state.paused = false;
   if (!NOLOCK) lock();
@@ -191,14 +191,15 @@ let promptT = 0, promptTarget = null;
 function findInteract() {
   const a = G.player; if (!a.alive || a.state !== 'ground') return null; if (a.vehicle) return { kind: 'exit', text: 'Exit vehicle' };
   let best = null, bd = 99;
-  const c = G.nearestChest(a, 2.8); if (c) { const d = Math.hypot(c.x - a.x, c.z - a.z); best = { kind: 'chest', o: c, text: 'Open Chest' }; bd = d; }
+  const c = G.nearestChest(a, 2.8); if (c) { const d = Math.hypot(c.x - a.x, c.z - a.z); best = { kind: 'chest', o: c, text: c.kind === 'llama' ? 'Smash Supply Llama' : c.kind === 'truck' ? 'Open Armored Truck' : 'Open ' + (c.style === 'metal' ? 'Blue Metal' : 'Wooden') + ' Chest (' + G.RARITY[c.rar].name + ')', color: G.RARITY[c.rar].color }; bd = d; }
   const l = G.nearestLoot(a, 2.8); if (l) { const d = Math.hypot(l.x - a.x, l.z - a.z); if (d < bd) { bd = d; best = { kind: 'loot', o: l, text: 'Pick up ' + G.itemName(l.item), color: G.RARITY[l.item.rarity !== undefined ? l.item.rarity : 0].color }; } }
   const v = G.nearestVehicle(a, 3.4); if (v) { const d = Math.hypot(v.x - a.x, v.z - a.z); if (d < bd) { bd = d; best = { kind: 'veh', o: v, text: 'Drive Buggy' }; } }
+  if (!best && G.Extras) { const b = a.hideLock ? a.hideLock : G.Extras.nearestBush(a, 3.4); if (b && (a.hideLock || Math.hypot(b.x - a.x, b.z - a.z) > b.r * 0.6)) best = { kind: 'bush', o: b, text: a.hideLock ? 'Leave bush' : 'Hide in bush' }; }
   return best;
 }
 function interact() {
   const a = G.player; if (!a.alive || state.paused) return; const t = findInteract(); if (!t) return;
-  if (t.kind === 'exit') G.exitVehicle(a); else if (t.kind === 'chest') { G.World.openChest(t.o); G.Audio.play('chest'); } else if (t.kind === 'loot') G.pickupLoot(a, t.o); else if (t.kind === 'veh') G.enterVehicle(a, t.o);
+  if (t.kind === 'exit') G.exitVehicle(a); else if (t.kind === 'chest') { G.World.openChest(t.o); G.Audio.play('chest'); } else if (t.kind === 'loot') G.pickupLoot(a, t.o); else if (t.kind === 'veh') G.enterVehicle(a, t.o); else if (t.kind === 'bush') { if (a.hideLock) { const b = a.hideLock; a.hideLock = null; a.x = b.x - Math.sin(a.yaw) * (b.r + 1.4); a.z = b.z - Math.cos(a.yaw) * (b.r + 1.4); } else { G.Extras.enterBush(a, t.o); G.UI.toast('Hidden in the bush', 900, true); } }
 }
 
 /* ================= loot visuals / culling ================= */
@@ -217,8 +218,8 @@ function updateLootViz(dt) {
 }
 function updateCull(dt) {
   cullT -= dt; if (cullT > 0) return; cullT = 0.3; const cx = camera.position.x, cz = camera.position.z;
-  for (const c of G.chests) { const d = Math.hypot(c.x - cx, c.z - cz); c.grp.visible = d < 380; c.mesh.visible = c.lid.visible = d < 130; }
-  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < 280; if (a.plate) a.plate.visible = d < 32 && a.alive; }
+  for (const c of G.chests) { const d = Math.hypot(c.x - cx, c.z - cz); c.grp.visible = !c.gone && d < 380; c.mesh.visible = c.lid.visible = d < 130; }
+  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < 280 && !(a.hidden && d > 9); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
 }
 
 /* ================= camera ================= */
@@ -251,6 +252,7 @@ function updateCamera(dt) {
     // hide player model when scoped
     if (w === p) p.rig.root.visible = !G.scoped && p.state !== 'bus' && p.alive || (!p.alive);
   }
+  if (G.debug && G.debug.cam) { const c = G.debug.cam; camera.position.set(c[0], c[1], c[2]); camera.lookAt(c[3], c[4], c[5]); }
   fovCur += (fovT - fovCur) * Math.min(1, dt * 10); if (Math.abs(camera.fov - fovCur) > 0.05) { camera.fov = fovCur; camera.updateProjectionMatrix(); }
   // follow lights / sky
   sky.position.copy(camera.position); sunDisc.position.set(camera.position.x + 1400 * 0.45, camera.position.y + 1400 * 0.75, camera.position.z + 1400 * 0.3);
@@ -276,6 +278,7 @@ function updatePlayer(dt) {
       if (it && it.type === 'weapon') { const W = G.WEAPONS[it.w]; if (W.auto || mouse.lEdge) G.tryFire(a, aim.x, aim.y, aim.z); }
       else if (it && it.type === 'pickaxe') G.startSwing(a);
       else if (it && it.type === 'heal' && mouse.lEdge) G.startHeal(a);
+      else if (it && it.type === 'gadget' && mouse.lEdge) G.useGadget(a, aim.x, aim.y, aim.z);
     }
     if (mouse.lEdge && !(it && it.type === 'weapon' && mouse.l)) { }
     a.placeCD -= 0; // handled in updateActor
@@ -301,7 +304,7 @@ function simStep(dt) {
   if (!G.debug.noAI) for (const a of G.actors) { if (a.isBot) G.AI.update(a, dt); }
   G.updateVehicles(dt);
   for (const a of G.actors) G.updateActor(a, dt);
-  G.updateProjectiles(dt); G.FX.update(dt); G.World.updateClouds(dt); winnerCheck();
+  G.updateExtras(dt); G.updateProjectiles(dt); G.FX.update(dt); G.World.updateClouds(dt); winnerCheck();
   const p = G.player; $('busHint').style.display = p.state === 'bus' && p.alive ? 'block' : 'none';
   const ah = $('airHint'); if (p.state === 'freefall') { ah.style.display = 'block'; ah.innerHTML = 'Free-falling — <b>W</b> dive • <b>SPACE</b> deploy glider (auto at low altitude)'; } else if (p.state === 'glide') { ah.style.display = 'block'; ah.innerHTML = 'Gliding — steer to land near buildings & loot'; } else ah.style.display = 'none';
   if (G.waypoint && Math.hypot(p.x - G.waypoint.x, p.z - G.waypoint.z) < 8) G.waypoint = null;
@@ -323,6 +326,7 @@ function frame(ts) {
 G.debug = {
   drop(poiId, dx, dz) { const p = G.POIS.find(q => q.id === poiId) || G.POIS[0]; const a = G.player; a.state = 'ground'; a.x = p.x + (dx || 0); a.z = p.z + (dz || 0); a.y = G.World.groundY(a.x, a.z, 500, 0); a.onGround = true; a.vx = a.vy = a.vz = 0; a.rig.glider.visible = false; a.rig.lean.rotation.x = 0; $('busHint').style.display = 'none'; },
   kit() { const a = G.player; for (const [i, w, r] of [[1, 'ar', 3], [2, 'shotgun', 2], [3, 'sniper', 4], [4, 'rocket', 1]]) a.inv[i] = { type: 'weapon', w, rarity: r, mag: G.WEAPONS[w].mag }; a.inv[5] = { type: 'heal', id: 'medkit', n: 2 }; a.ammo = { light: 100, medium: 150, shells: 30, heavy: 20, rockets: 8 }; a.mats = { wood: 300, stone: 200, metal: 100 }; G.selectSlot(a, 1); },
+  kit2() { const a = G.player; a.inv[1] = { type: 'weapon', w: 'shotgun', rarity: 3, mag: 2 }; a.inv[2] = { type: 'weapon', w: 'dual', rarity: 2, mag: 24 }; a.inv[3] = { type: 'gadget', id: 'tnt', n: 4 }; a.inv[4] = { type: 'gadget', id: 'launchpad', n: 2 }; a.inv[5] = { type: 'heal', id: 'chug', n: 1 }; a.ammo = { light: 100, medium: 150, shells: 30, heavy: 20, rockets: 8 }; G.selectSlot(a, 1); },
   step(n, dt) { for (let i = 0; i < n; i++) { simStep(dt || 0.05); } },
   fastForward(sec) { G.time += sec; const S = G.storm; for (let i = 0; i < sec * 10; i++) updateStorm(0.1); },
   warpBus(t) { const b = G.bus; if (b.active) { b.x += b.vx * t; b.z += b.vz * t; b.t += t; } },
@@ -333,7 +337,7 @@ G.debug = {
 setTimeout(() => {
   try { init(); } catch (e) { $('loadMsg').textContent = 'Failed to start: ' + e.message; console.error(e); throw e; }
   $('loading').style.display = 'none'; state.phase = 'lobby'; G.Audio.lobbyMusic && 0; 
-  $('lobbyInfo').innerHTML = 'Island: ' + G.POIS.length + ' named locations • ' + G.World.buildings.length + ' buildings • ' + G.chests.length + ' chests<br>35 players • 34 AI bots • storm shrinks in 6 phases<br>Three.js (bundled locally) — all art generated procedurally';
+  $('lobbyInfo').innerHTML = 'Island: ' + G.POIS.length + ' named locations • ' + G.World.buildings.length + ' buildings • ' + G.chests.length + ' chests & supply trucks • ' + G.Extras.bushes.length + ' bushes • ' + G.Extras.camps.length + ' campfires • ' + G.Extras.rifts.length + ' rifts<br>35 players • 34 AI bots • storm shrinks in 6 phases<br>Three.js (bundled locally) — all art generated procedurally';
   requestAnimationFrame(frame);
   if (Q.has('autostart') || sessionStorage.getItem('sf_auto')) { sessionStorage.removeItem('sf_auto'); setTimeout(() => startMatch(), 200); }
 }, 60);

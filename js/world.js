@@ -147,12 +147,24 @@ G.randRarity = function (chest) { const w = chest ? G.CHEST_RARITY_W : G.RARITY.
 G.makeWeaponItem = function (id, rar, chest) { const ids = Object.keys(G.WEAPONS); id = id || wpick(ids, k => G.WEAPONS[k].w); return { kind: 'weapon', w: id, rarity: rar === undefined ? G.randRarity(chest) : rar }; };
 G.makeHealItem = function (id) { const ids = Object.keys(G.HEALS); id = id || wpick(ids, k => G.HEALS[k].w); const h = G.HEALS[id]; return { kind: 'heal', id, n: h.n[0] + Math.floor(Math.random() * (h.n[1] - h.n[0] + 1)) }; };
 G.makeAmmoItem = function (t) { const ids = Object.keys(G.AMMO); t = t || G.pick(ids); const a = G.AMMO[t]; return { kind: 'ammo', t, n: Math.round(a.pick * G.rand(0.7, 1.2)) }; };
-G.randomFloorItem = function () { const r = Math.random(); return r < 0.4 ? G.makeWeaponItem() : r < 0.7 ? G.makeAmmoItem() : G.makeHealItem(); };
+G.makeGadgetItem = function (id) { const ids = Object.keys(G.GADGETS); id = id || wpick(ids, k => G.GADGETS[k].w); const g = G.GADGETS[id]; return { kind: 'gadget', id, n: g.n[0] + Math.floor(Math.random() * (g.n[1] - g.n[0] + 1)) }; };
+G.randomFloorItem = function () { const r = Math.random(); return r < 0.36 ? G.makeWeaponItem() : r < 0.62 ? G.makeAmmoItem() : r < 0.9 ? G.makeHealItem() : G.makeGadgetItem(); };
 G.addLoot = function (item, x, y, z, bld) { const l = { id: lootId++, item, x, y, z, taken: false, bld: bld || null }; G.loot.push(l); return l; };
-G.chestItems = function () {
-  const w = G.makeWeaponItem(null, undefined, true); const out = [w, G.makeAmmoItem(G.WEAPONS[w.w].ammo), G.makeHealItem()];
-  if (Math.random() < 0.55) { const w2 = G.makeWeaponItem(null, undefined, true); out.push(w2, G.makeAmmoItem(G.WEAPONS[w2.w].ammo)); }
+const _rr = (w) => { let t = 0; for (const v of w) t += v; let r = Math.random() * t; for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; } return 0; };
+G.chestRarity = function (style) { return style === 'metal' ? 2 + _rr([45, 38, 17]) : _rr([36, 40, 24]); }; // wooden: common-rare, blue metallic: rare-legendary
+G.chestItems = function (c) {
+  const kind = (c && c.kind) || 'chest', rar = c && c.rar !== undefined ? c.rar : 1; const metal = c && c.style === 'metal';
+  const R = (d) => G.clamp(rar + d, 0, 4); const out = [];
+  if (kind === 'llama' || kind === 'truck') {
+    const n = kind === 'llama' ? 3 : 2; for (let i = 0; i < n; i++) { const w = G.makeWeaponItem(null, G.clamp(2 + Math.floor(Math.random() * 3), 2, 4), true); out.push(w, G.makeAmmoItem(G.WEAPONS[w.w].ammo)); }
+    out.push(G.makeHealItem(kind === 'llama' ? 'chug' : G.pick(['shield', 'slurp', 'medkit'])), G.makeHealItem('shield'), G.makeGadgetItem('tnt'), G.makeGadgetItem(kind === 'llama' ? 'launchpad' : 'spike')); if (kind === 'llama') out.push(G.makeHealItem('slurp'));
+    return out;
+  }
+  const w = G.makeWeaponItem(null, R(Math.floor(Math.random() * 3) - 1), true); out.push(w, G.makeAmmoItem(G.WEAPONS[w.w].ammo), G.makeHealItem());
+  if (Math.random() < (metal ? 0.9 : 0.5)) { const w2 = G.makeWeaponItem(null, R(Math.floor(Math.random() * 3) - 1), true); out.push(w2, G.makeAmmoItem(G.WEAPONS[w2.w].ammo)); }
   if (Math.random() < 0.4) out.push(G.makeHealItem());
+  if (metal) out.push(G.makeHealItem(Math.random() < 0.35 ? 'chug' : G.pick(['shield', 'slurp', 'minishield'])));
+  if (Math.random() < (metal ? 0.5 : 0.2)) out.push(G.makeGadgetItem());
   return out;
 };
 
@@ -270,14 +282,15 @@ const W = G.World = {
   batchMat: null, scene: null, mapCanvas: null,
 };
 
-W.addChest = function (x, y, z, yaw, bld) {
-  const grp = G.makeChest(); grp.position.set(x, y, z); grp.rotation.y = yaw; W.scene.add(grp);
-  const c = { x, y, z, yaw, opened: false, mesh: grp.userData.body, lid: grp.userData.lid, beam: grp.userData.beam, grp, bld };
+W.addChest = function (x, y, z, yaw, bld, style, rar) {
+  style = style || (Math.random() < 0.3 ? 'metal' : 'wood'); rar = rar === undefined ? G.chestRarity(style) : rar;
+  const grp = G.makeChest(style, rar); grp.position.set(x, y, z); grp.rotation.y = yaw; W.scene.add(grp);
+  const c = { kind: 'chest', style, rar, x, y, z, yaw, opened: false, mesh: grp.userData.body, lid: grp.userData.lid, beam: grp.userData.beam, grp, bld };
   G.chests.push(c); return c;
 };
 W.openChest = function (c) {
-  if (c.opened) return; c.opened = true; c.lid.rotation.x = -1.9; c.beam.visible = false;
-  for (const it of G.chestItems()) { const a = Math.random() * 6.28, r = G.rand(0.9, 1.7); G.addLoot(it, c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r, c.bld); }
+  if (c.opened || c.falling) return; c.opened = true; c.lid.rotation.x = -1.9; c.beam.visible = false; if (c.onOpen) c.onOpen(c);
+  for (const it of G.chestItems(c)) { const a = Math.random() * 6.28, r = G.rand(0.9, 1.9); G.addLoot(it, c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r, c.bld); }
 };
 
 W.destroyBox = function (b) {
@@ -318,6 +331,7 @@ W.build = function (scene) {
     if (Math.hypot(x - G.LK.x, z - G.LK.z) < G.LK.r + 20) continue;
     lone.push({ x, z, h }); pads.push({ x, z, r: 11, h });
   }
+  if (G.Extras) G.Extras.sites(pads, roads, P, H0, rects, R);
   // height grid
   for (let iz = 0; iz <= N; iz++) for (let ix = 0; ix <= N; ix++) heights[iz * (N + 1) + ix] = Hfull(-HALF + ix * CELLV, -HALF + iz * CELLV);
   scene.add(terrainMesh());
@@ -419,6 +433,7 @@ W.build = function (scene) {
     const rr = s * 0.85; const bx = addBox({ x0: x - rr, x1: x + rr, z0: z - rr, z1: z + rr, y0: h - 1, y1: h + s * 1.1, kind: 'rock', mat: 'stone', hp: 8, col: 0x9ea2ad }); bx.rock = { m: mRock, i: rc }; W.rocks.push(bx); rc++;
   }
   mRock.count = rc; mRock.instanceMatrix.needsUpdate = true; if (mRock.instanceColor) mRock.instanceColor.needsUpdate = true;
+  if (G.Extras) G.Extras.populate(scene, rects, R);
   // flowers
   const fg = new T.OctahedronGeometry(0.22, 0); const nF = 1600; const mF = new T.InstancedMesh(fg, new T.MeshLambertMaterial({ color: 0xffffff }), nF); let fc = 0; const fcols = [0xff6bb5, 0xffe14a, 0xffffff, 0xff8a3a, 0xa97bff];
   for (let i = 0; i < 6000 && fc < nF; i++) { const x = R(-430, 430), z = R(-430, 430); const h = heightAt(x, z); if (h < 1.8 || h > 30 || roadDist(x, z) < 4 || rects.some(r => x > r.x0 - 1 && x < r.x1 + 1 && z > r.z0 - 1 && z < r.z1 + 1)) continue; ps.set(x, h + 0.2, z); sc.set(1, 1, 1); q.identity(); mat4.compose(ps, q, sc); mF.setMatrixAt(fc, mat4); col.setHex(fcols[Math.floor(rng() * 5)]); mF.setColorAt(fc, col); fc++; }

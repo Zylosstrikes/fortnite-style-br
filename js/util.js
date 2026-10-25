@@ -52,6 +52,7 @@ G.Audio = (function () {
     s.connect(f); f.connect(g); route(g, pan); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02); voices++; s.onended = () => voices--;
   }
   const S = {
+    dual: (v, p) => { noise(0.12, 0.5 * v, 2500, 'bandpass', p, 0, 600); tone(300, 0.08, 'square', 0.15 * v, 90, 0, p); tone(340, 0.06, 'square', 0.1 * v, 100, 0.03, p); },
     pistol: (v, p) => { noise(0.12, 0.5 * v, 2500, 'bandpass', p, 0, 600); tone(300, 0.08, 'square', 0.15 * v, 90, 0, p); },
     shotgun: (v, p) => { noise(0.35, 0.9 * v, 1800, 'lowpass', p, 0, 200); tone(120, 0.2, 'sawtooth', 0.3 * v, 40, 0, p); },
     ar: (v, p) => { noise(0.1, 0.55 * v, 3200, 'bandpass', p, 0, 800); tone(220, 0.07, 'square', 0.18 * v, 70, 0, p); },
@@ -76,6 +77,7 @@ G.Audio = (function () {
     splash: (v, p) => noise(0.3, 0.4 * v, 1500, 'bandpass', p, 0, 400),
     storm: (v) => { tone(220, 0.5, 'sawtooth', 0.15 * v, 160); tone(165, 0.6, 'sawtooth', 0.15 * v, 110, 0.3); },
     victory: (v) => { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.28, 'triangle', 0.3 * v, 0, i * 0.15)); },
+    levelup: (v) => { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.22, 'triangle', 0.28 * v, 0, i * 0.09)); },
     elim: (v) => { [440, 370, 311, 247].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.22 * v, 0, i * 0.18)); },
     click: (v) => tone(800, 0.04, 'square', 0.1 * v, 600),
     emote: (v, p) => { [392, 523, 659, 523].forEach((f, i) => tone(f, 0.12, 'square', 0.12 * v, 0, i * 0.1, p)); },
@@ -84,7 +86,7 @@ G.Audio = (function () {
     crash: (v, p) => { noise(0.3, 0.7 * v, 600, 'lowpass', p, 0, 120); },
     step: (v, p) => noise(0.05, 0.12 * v, 700, 'lowpass', p),
   };
-  const maxD = { shotgun: 160, sniper: 300, rocket: 220, explosion: 300, ar: 180, smg: 140, pistol: 120, reload: 30, build: 60, harvest: 50, break: 90, emote: 40, crash: 80, step: 25, chest: 40, splash: 40 };
+  const maxD = { dual: 120, shotgun: 160, sniper: 300, rocket: 220, explosion: 300, ar: 180, smg: 140, pistol: 120, reload: 30, build: 60, harvest: 50, break: 90, emote: 40, crash: 80, step: 25, chest: 40, splash: 40 };
   return {
     L, init, tone, noise, get ctx() { return ctx; },
     play(name, vol, pan) { if (!ctx || muted) return; const f = S[name]; if (f) f(vol === undefined ? 1 : vol, pan || 0); },

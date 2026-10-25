@@ -10,12 +10,13 @@ G.RARITY = [
 ];
 G.CHEST_RARITY_W = [8, 30, 36, 20, 6];
 G.WEAPONS = {
-  pistol:  { name: 'Peacemaker Pistol', short: 'Pistol', ammo: 'light', dmg: 24, rate: 6.5, mag: 16, reload: 1.6, spread: 0.010, range: 120, pellets: 1, auto: false, hs: 2.0, w: 15, bots: 20 },
-  shotgun: { name: 'Thunder Shotgun', short: 'Shotgun', ammo: 'shells', dmg: 11, rate: 1.05, mag: 5, reload: 2.5, spread: 0.065, range: 45, pellets: 9, auto: false, hs: 1.6, w: 17, bots: 11 },
-  ar:      { name: 'Ranger Assault Rifle', short: 'AR', ammo: 'medium', dmg: 30, rate: 5.5, mag: 30, reload: 2.3, spread: 0.014, range: 170, pellets: 1, auto: true, hs: 1.6, w: 20, bots: 28 },
-  smg:     { name: 'Buzz SMG', short: 'SMG', ammo: 'light', dmg: 17, rate: 11, mag: 30, reload: 2.0, spread: 0.028, range: 100, pellets: 1, auto: true, hs: 1.5, w: 18, bots: 20 },
+  pistol:  { name: 'Peacemaker Pistol', short: 'Pistol', ammo: 'light', dmg: 24, rate: 6.5, mag: 16, reload: 1.6, spread: 0.010, range: 120, pellets: 1, auto: false, hs: 2.0, w: 13, bots: 20 },
+  dual:    { name: 'Twin Gold-Grip Pistols', short: 'Duals', ammo: 'light', dmg: 20, rate: 9, mag: 24, reload: 2.1, spread: 0.018, range: 100, pellets: 1, auto: false, hs: 1.9, w: 8, bots: 21 },
+  shotgun: { name: 'Double-Barrel Shotgun', short: 'D-Barrel', ammo: 'shells', dmg: 15, rate: 1.25, mag: 2, reload: 2.1, spread: 0.07, range: 45, pellets: 10, auto: false, hs: 1.6, w: 15, bots: 11 },
+  ar:      { name: 'Dune Scar Rifle', short: 'SCAR', ammo: 'medium', dmg: 30, rate: 5.5, mag: 30, reload: 2.3, spread: 0.014, range: 170, pellets: 1, auto: true, hs: 1.6, w: 18, bots: 28 },
+  smg:     { name: 'Micro SMG', short: 'Micro', ammo: 'light', dmg: 16, rate: 12, mag: 30, reload: 1.9, spread: 0.030, range: 95, pellets: 1, auto: true, hs: 1.5, w: 16, bots: 20 },
   sniper:  { name: 'Longshot Sniper', short: 'Sniper', ammo: 'heavy', dmg: 95, rate: 0.6, mag: 1, reload: 2.6, spread: 0.0012, range: 420, pellets: 1, auto: false, hs: 2.4, zoom: 18, w: 8, bots: 8 },
-  rocket:  { name: 'Boom Launcher', short: 'Rocket', ammo: 'rockets', dmg: 100, rate: 0.4, mag: 1, reload: 3.2, spread: 0.004, range: 300, pellets: 1, auto: false, hs: 1, rocket: true, w: 4, bots: 3 },
+  rocket:  { name: 'Orange Boom Cannon', short: 'Cannon', ammo: 'rockets', dmg: 100, rate: 0.4, mag: 1, reload: 3.2, spread: 0.004, range: 300, pellets: 1, auto: false, hs: 1, rocket: true, w: 4, bots: 3 },
 };
 G.AMMO = {
   light: { name: 'Light Bullets', color: '#ffa43a', hex: 0xffa43a, pick: 24, max: 220 },
@@ -25,12 +26,27 @@ G.AMMO = {
   rockets: { name: 'Rockets', color: '#c05cff', hex: 0xc05cff, pick: 3, max: 14 },
 };
 G.HEALS = {
-  bandage:   { name: 'Bandages', hp: 15, cap: 75, sh: 0, time: 3.5, stack: 15, color: '#f4f4f4', hex: 0xf4f4f4, w: 30, n: [2, 5] },
+  bandage:   { name: 'Bandages', hp: 15, cap: 75, sh: 0, time: 3.5, stack: 15, color: '#f4f4f4', hex: 0xf4f4f4, w: 28, n: [2, 5] },
   medkit:    { name: 'Med Kit', hp: 100, cap: 100, sh: 0, time: 8, stack: 3, color: '#ff4d4d', hex: 0xff4d4d, w: 10, n: [1, 1] },
-  minishield:{ name: 'Mini Shield', hp: 0, cap: 100, sh: 25, shcap: 50, time: 2.5, stack: 6, color: '#6ec6ff', hex: 0x6ec6ff, w: 22, n: [1, 2] },
+  minishield:{ name: 'Small Shield Potion', hp: 0, cap: 100, sh: 25, shcap: 50, time: 2.5, stack: 6, color: '#6ec6ff', hex: 0x6ec6ff, w: 20, n: [1, 2] },
   shield:    { name: 'Shield Potion', hp: 0, sh: 50, shcap: 100, time: 5, stack: 3, color: '#2f7bff', hex: 0x2f7bff, w: 9, n: [1, 1] },
-  slurp:     { name: 'Slurp Juice', hp: 25, cap: 100, sh: 25, shcap: 100, time: 3.2, stack: 2, color: '#38e8ff', hex: 0x38e8ff, w: 5, n: [1, 1] },
+  slurp:     { name: 'Slurp Bottle', hp: 25, cap: 100, sh: 25, shcap: 100, time: 3.2, stack: 2, color: '#38e8ff', hex: 0x38e8ff, w: 6, n: [1, 1] },
+  chug:      { name: 'Chug Jug', hp: 100, cap: 100, sh: 100, shcap: 100, time: 12, stack: 1, color: '#3dffb4', hex: 0x3dffb4, w: 3, n: [1, 1] },
 };
+G.GADGETS = {
+  tnt:       { name: 'Dynamite Bundle', short: 'TNT', color: '#ff4a3a', hex: 0xff4a3a, w: 7, n: [1, 3], stack: 6, fuse: 2.6, dmg: 120, radius: 7 },
+  launchpad: { name: 'Launch Pad Trap', short: 'Launch Pad', color: '#ffd23a', hex: 0xffd23a, w: 6, n: [1, 2], stack: 3 },
+  spike:     { name: 'Spike Floor Trap', short: 'Spike Trap', color: '#c8ccd6', hex: 0xc8ccd6, w: 5, n: [1, 2], stack: 3, dmg: 45 },
+};
+G.PICKAXES = [
+  { id: 'pick', name: 'Classic Pickaxe' }, { id: 'axe', name: 'Battle Axe' }, { id: 'shovel', name: 'Digger Shovel' },
+  { id: 'sickle', name: 'Reaper Sickle' }, { id: 'hammer', name: 'Smash Hammer' },
+];
+// XP / level (persisted in localStorage, no currency of any kind)
+G.xpToNext = lvl => 120 + (lvl - 1) * 60;
+G.levelFromXp = function (xp) { let l = 1; while (xp >= G.xpToNext(l)) { xp -= G.xpToNext(l); l++; } return { level: l, into: xp, need: G.xpToNext(l) }; };
+G.loadXp = function () { try { return Math.max(0, parseInt(localStorage.getItem('sf_xp') || '0', 10) || 0); } catch (e) { return 0; } };
+G.saveXp = function (x) { try { localStorage.setItem('sf_xp', String(x)); } catch (e) { } };
 G.MATS = {
   wood:  { name: 'Wood', hp: 150, color: 0xc98b4c, css: '#d99a55', cost: 10 },
   stone: { name: 'Stone', hp: 280, color: 0xa4acb6, css: '#a9b2bd', cost: 10 },
