@@ -36,11 +36,11 @@ function init() {
   for (let i = 0; i < 44; i++) { const g = new T.Group(); const beam = new T.Mesh(beamGeo, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); beam.position.y = 3.5; g.add(beam); const ring = new T.Mesh(new T.RingGeometry(0.5, 0.75, 20), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: T.DoubleSide, blending: T.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; g.add(ring); const holder = new T.Group(); g.add(holder); g.visible = false; scene.add(g); lootViz.push({ g, beam, ring, holder, cur: null, icon: null }); }
   // build ghosts
   for (const t of ['wall', 'floor', 'ramp0', 'ramp1', 'ramp2', 'ramp3']) { const geo = t === 'wall' ? G.geo.wall : t === 'floor' ? G.geo.floor : G.geo.ramp[+t[4]]; const m = new T.Mesh(geo, G.previewOK); m.visible = false; scene.add(m); ghost[t] = m; }
-  G.UI.init(); bindInput(); if ('ontouchstart' in window || Q.has('touch')) initTouch();
+  G.UI.init(); bindInput(); if (detectTouch()) initTouch();
   resize();
 }
-function resize() { if (!renderer) return; renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
-window.addEventListener('resize', resize);
+function resize() { layoutTouch(); if (!renderer) return; renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 150));
 
 /* ================= storm ================= */
 function initStorm() { G.storm = { phase: 0, stage: 'wait', t: 0, cx: 0, cz: 0, r: 650, c0x: 0, c0z: 0, r0: 650, nx: 0, nz: 0, nr: 330, left: G.STORM[0].wait, dmg: 1, tick: 0 }; planStorm(); }
@@ -77,7 +77,7 @@ function startMatch() {
   $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden'); $('busHint').style.display = 'block'; state.phase = 'playing'; state.ended = false; state.spec = null; state.matchOver = false; state.paused = false;
   if (!NOLOCK) lock();
   $('lobbyInfo').textContent = '';
-  if (G.touchOn) $('touch').classList.remove('hidden');
+  if (G.touchOn) { $('touch').classList.remove('hidden'); $('lookpad').classList.remove('hidden'); $('busHint').innerHTML = 'Tap <b>DROP</b> to jump from the Battle Bus!'; $('pause').querySelector('p').textContent = 'Tap RESUME to keep playing.'; layoutTouch(); }
 }
 const UI = () => G.UI;
 function lock() { if (NOLOCK) return; const c = $('c'); try { const p = c.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
@@ -114,6 +114,9 @@ const act = {
   edit() { const a = G.player; if (!a.alive || a.state !== 'ground') return; const d = camDir(); G.Build.edit(a, camera.position.x, camera.position.y, camera.position.z, d.x, d.y, d.z); },
   emote(n) { if (G.player.alive) G.startEmote(G.player, n); },
   map() { toggleMap(); },
+  pause() { if (state.phase !== 'playing' || state.ended === true) return; state.paused = true; keys.KeyW = keys.KeyA = keys.KeyS = keys.KeyD = false; mouse.l = false; $('pause').classList.remove('hidden'); },
+  mute() { const m = G.Audio.toggleMute(); G.UI.toast(m ? 'Sound off' : 'Sound on', 800, true); return m; },
+  help() { toggleHelp(); },
 };
 G.act = act;
 function toggleMap() {
@@ -144,7 +147,7 @@ function bindInput() {
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.l = mouse.r = false; });
   const cv = $('c');
   window.addEventListener('mousedown', e => {
-    if (e.target.closest && e.target.closest('#lobby,#help,#end,#mapScreen,#pause,.slot')) return; G.Audio.init();
+    if (e.target.closest && e.target.closest('#lobby,#help,#end,#mapScreen,#pause,.slot')) return; if (G.touchOn && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return; G.Audio.init();
     if (state.phase !== 'playing' || state.paused) return; if (!NOLOCK && !G.touchOn && document.pointerLockElement !== cv) { lock(); return; }
     if (state.spec && !G.player.alive) { if (e.button === 0) cycleSpec(); return; }
     if (e.button === 0) { mouse.l = true; mouse.lEdge = true; } if (e.button === 2) mouse.r = true;
@@ -162,7 +165,9 @@ function bindInput() {
   $('pause').addEventListener('click', e => { if (e.target.id === 'pause') { lock(); } });
   $('againBtn').onclick = () => { sessionStorage.setItem('sf_auto', '1'); location.reload(); };
   $('specBtn').onclick = () => { G.UI.hideEnd(); state.ended = 'spectating'; if (!state.spec) state.spec = G.actors.find(a => a.alive) || null; G.UI.toast('Spectating — click to switch player', 2500, true); lock(); };
-  $('bigmap').addEventListener('click', e => G.UI.bigClick(e));
+  $('bigmap').addEventListener('click', e => G.UI.bigClick(e)); $('mapClose').onclick = () => toggleMap();
+  document.addEventListener('gesturestart', e => e.preventDefault()); document.addEventListener('dblclick', e => e.preventDefault());
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 || !(e.target.closest && e.target.closest('.lobby-left,.panel'))) e.preventDefault(); }, { passive: false });
   $('optShadow').onchange = e => { renderer.shadowMap.enabled = e.target.checked; sun.castShadow = e.target.checked; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); };
   $('optSound').onchange = e => { if (G.Audio.muted === e.target.checked) G.Audio.toggleMute(); };
   const saved = localStorage.getItem('sf_name'); if (saved) $('nameInput').value = saved;
@@ -171,20 +176,108 @@ function bindInput() {
 function cycleSpec() { const al = G.actors.filter(a => a.alive); if (!al.length) return; const i = al.indexOf(state.spec); state.spec = al[(i + 1) % al.length]; }
 
 /* ================= touch ================= */
-function initTouch() {
-  G.touchOn = true; const t = $('touch'); t.innerHTML = '<div id="joy"><i></i></div><div id="lookpad"></div>'; const btn = (id, label, x, y, fn, hold, sz) => { const b = document.createElement('div'); b.className = 'tb'; b.textContent = label; b.style.cssText = (x[0] === 'l' ? 'left:' : 'right:') + x.slice(1) + 'px;bottom:' + y + 'px;' + (sz ? 'width:' + sz + 'px;height:' + sz + 'px' : ''); t.appendChild(b);
-    const down = e => { e.preventDefault(); b.classList.add('on'); fn(true); }, up = e => { e.preventDefault(); b.classList.remove('on'); if (hold) fn(false); }; b.addEventListener('touchstart', down, { passive: false }); b.addEventListener('touchend', up, { passive: false }); b.addEventListener('touchcancel', up, { passive: false }); };
-  btn('fire', 'FIRE', 'r40', 40, d => { mouse.l = d; if (d) mouse.lEdge = true; }, true, 90); btn('jump', 'JUMP', 'r150', 30, d => { if (d) { keys.Space = true; act.jump(); setTimeout(() => keys.Space = false, 150); } }, false);
-  btn('rel', 'R', 'r150', 100, d => d && act.reload(), false); btn('e', 'E', 'r40', 140, d => d && act.interact(), false); btn('ads', 'AIM', 'r210', 100, d => { mouse.r = d; }, true);
-  btn('w', 'WALL', 'l30', 240, d => d && act.build('wall')); btn('f', 'FLOOR', 'l100', 240, d => d && act.build('floor')); btn('z', 'RAMP', 'l30', 310, d => d && act.build('ramp')); btn('c', 'ROOF', 'l100', 310, d => d && act.build('roof'));
-  btn('s', 'SLOT', 'r260', 30, d => d && act.cycle(1)); btn('m', 'MAP', 'r210', 170, d => d && act.map()); btn('sp', 'SPRINT', 'l30', 380, d => { keys.ShiftLeft = d; }, true);
-  const joy = $('joy'), knob = joy.firstChild; let jid = null;
-  const jm = e => { for (const tt of e.changedTouches) if (tt.identifier === jid) { const r = joy.getBoundingClientRect(); let dx = tt.clientX - (r.left + 65), dy = tt.clientY - (r.top + 65); const l = Math.hypot(dx, dy), m = 50; if (l > m) { dx *= m / l; dy *= m / l; } knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; keys.KeyW = dy < -14; keys.KeyS = dy > 14; keys.KeyA = dx < -14; keys.KeyD = dx > 14; } };
-  joy.addEventListener('touchstart', e => { e.preventDefault(); jid = e.changedTouches[0].identifier; jm(e); }, { passive: false }); joy.addEventListener('touchmove', e => { e.preventDefault(); jm(e); }, { passive: false });
-  joy.addEventListener('touchend', () => { jid = null; knob.style.transform = ''; keys.KeyW = keys.KeyS = keys.KeyA = keys.KeyD = false; });
-  const lp = $('lookpad'); let lid = null, lx = 0, ly = 0; lp.addEventListener('touchstart', e => { e.preventDefault(); const tt = e.changedTouches[0]; lid = tt.identifier; lx = tt.clientX; ly = tt.clientY; }, { passive: false });
-  lp.addEventListener('touchmove', e => { e.preventDefault(); for (const tt of e.changedTouches) if (tt.identifier === lid) { yaw -= (tt.clientX - lx) * 0.005; pitch = G.clamp(pitch - (tt.clientY - ly) * 0.005, -1.45, 1.45); lx = tt.clientX; ly = tt.clientY; } }, { passive: false }); lp.addEventListener('touchend', () => { lid = null; });
+function detectTouch() {
+  if (Q.has('notouch')) return false; if (Q.has('touch')) return true;
+  const mm = q => !!(window.matchMedia && matchMedia(q).matches);
+  if (mm('(pointer:coarse)')) return true;
+  return ('ontouchstart' in window) && !mm('(pointer:fine)') && !mm('(hover:hover)');
 }
+/* One scale factor drives every touch control so the layout is identical in shape on every phone/tablet. */
+function layoutTouch() {
+  if (!G.touchOn) return; const w = innerWidth, h = innerHeight, port = h >= w, r = document.documentElement.style;
+  const s = port ? G.clamp(w / 390, 0.82, 1.2) : G.clamp(h / 390, 0.8, 1.2);
+  const slot = port ? Math.floor(Math.min(50, (w - 28 - 5 * 4) / 6)) : Math.floor(Math.min(46, h * 0.115, (w - 640) / 6 + 20));
+  r.setProperty('--s', s.toFixed(3)); r.setProperty('--slot', Math.max(34, slot) + 'px');
+  // portrait: controls sit above the ammo/health/hotbar stack; landscape: stack lives between the two thumbs
+  r.setProperty('--hb', port ? (Math.max(34, slot) + 60) + 'px' : '0px');
+  document.body.classList.toggle('port', port); document.body.classList.toggle('land', !port);
+}
+const ICONS = {
+  map: '<svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>',
+  sound: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="wave" d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg>',
+  help: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 115 .8c0 1.8-2.5 2-2.5 3.7M12 17.5v.1"/></svg>',
+};
+let fireRel = false, fireTick = 0, simTick = 0; // a very short tap still reaches one sim step
+const TB = {}; let sprintL = false, joyFar = false, aimOn = false, tsig = {};
+function initTouch() {
+  G.touchOn = true; document.body.classList.add('touch'); layoutTouch();
+  const t = $('touch'), lp = $('lookpad');
+  t.innerHTML = '<div id="leftCtl"><div id="buildPanel" class="hidden"></div><div id="joy"><i></i></div></div><div id="actions"></div>';
+  const actions = $('actions'), panel = $('buildPanel');
+  const look = (dx, dy) => { const k = 0.005 * (G.scoped ? 0.35 : mouse.r ? 0.7 : 1); yaw -= dx * k; pitch = G.clamp(pitch - dy * k, -1.45, 1.45); };
+  const bindPtr = (el, h) => { let pid = null;
+    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (pid !== null) return; pid = e.pointerId; try { el.setPointerCapture(pid); } catch (_) { } el.classList.add('down'); G.Audio.init(); h.down && h.down(e); });
+    el.addEventListener('pointermove', e => { if (e.pointerId === pid && h.move) h.move(e); });
+    const up = e => { if (e.pointerId !== pid) return; pid = null; el.classList.remove('down'); h.up && h.up(e); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    el.addEventListener('contextmenu', e => e.preventDefault()); };
+  const mk = (parent, id, label, cls, pos, h) => { const b = document.createElement('div'); b.className = 'tb ' + cls; b.id = 'tb-' + id; b.innerHTML = label; if (pos) b.style.cssText = pos; parent.appendChild(b); TB[id] = b; bindPtr(b, h); return b; };
+  const P = (r, b, s) => 'right:' + r + 'px;bottom:' + b + 'px;width:' + s + 'px;height:' + s + 'px';
+  /* ---- right-hand action cluster (design px, scaled by --s). FIRE in the corner, the rest in an arc around it ---- */
+  let fx = 0, fy = 0;
+  mk(actions, 'fire', 'FIRE', 'fire', P(0, 0, 80), { down: e => { mouse.l = true; mouse.lEdge = true; fireRel = false; fireTick = simTick; fx = e.clientX; fy = e.clientY; }, move: e => { look(e.clientX - fx, e.clientY - fy); fx = e.clientX; fy = e.clientY; }, up: () => { if (simTick === fireTick) fireRel = true; else mouse.l = false; } });
+  mk(actions, 'aim', 'AIM', '', P(88, 6, 52), { down: () => { aimOn = !aimOn; mouse.r = aimOn; TB.aim.classList.toggle('on', aimOn); } });
+  mk(actions, 'jump', 'JUMP', '', P(13, 90, 54), { down: () => { keys.Space = true; act.jump(); }, up: () => { keys.Space = false; } });
+  mk(actions, 'sprint', 'SPRINT', '', P(88, 70, 48), { down: () => { sprintL = !sprintL; sprintSync(); } });
+  mk(actions, 'reload', 'RELOAD', '', P(148, 62, 48), { down: () => act.reload() });
+  mk(actions, 'build', 'BUILD', '', P(13, 154, 50), { down: () => { const a = G.player; if (!a || !a.alive) return; if (a.buildMode) act.build(a.buildType); else act.build(a.buildType || 'wall'); } });
+  mk(actions, 'emote', 'EMOTE', '', P(148, 116, 44), { down: () => openEmotes(true) });
+  mk(actions, 'use', '<b>E</b><span>USE</span>', 'ctx off', P(88, 126, 54), { down: () => act.interact() });
+  mk(actions, 'air', 'DROP', 'ctx off', P(13, 90, 54), { down: () => act.jump() });
+  /* ---- build panel: wall/floor/ramp/roof, material cycle, edit ---- */
+  for (const [n, k] of [['wall', 'Q'], ['floor', 'F'], ['ramp', 'Z'], ['roof', 'C']]) mk(panel, n, '<b>' + k + '</b>' + n.toUpperCase(), '', '', { down: () => { const a = G.player; if (!a || !a.alive || a.state !== 'ground') return; if (!(a.buildMode && a.buildType === n)) act.build(n); } });
+  mk(panel, 'mat', '<b>0</b>WOOD', 'mat', '', { down: () => act.mat() });
+  mk(panel, 'edit', '<b>X</b>EDIT', 'edit', '', { down: () => act.edit() });
+  /* ---- joystick (left thumb) ---- */
+  const joy = $('joy'), knob = joy.firstChild; let jid = null;
+  const jset = e => { const r = joy.getBoundingClientRect(), R = r.width / 2, sc = r.width / 124; let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R); const m = R * 0.62, l = Math.hypot(dx, dy); if (l > m) { dx *= m / l; dy *= m / l; }
+    knob.style.transform = 'translate(' + (dx / sc) + 'px,' + (dy / sc) + 'px)'; const nx = dx / m, ny = dy / m;
+    keys.KeyW = ny < -0.28; keys.KeyS = ny > 0.28; keys.KeyA = nx < -0.28; keys.KeyD = nx > 0.28; joyFar = l >= m * 0.97 && ny < -0.45; sprintSync(); };
+  const jend = () => { jid = null; knob.style.transform = ''; keys.KeyW = keys.KeyS = keys.KeyA = keys.KeyD = false; joyFar = false; sprintL = false; sprintSync(); };
+  joy.addEventListener('pointerdown', e => { e.preventDefault(); if (jid !== null) return; jid = e.pointerId; try { joy.setPointerCapture(jid); } catch (_) { } G.Audio.init(); jset(e); });
+  joy.addEventListener('pointermove', e => { if (e.pointerId === jid) jset(e); });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) joy.addEventListener(ev, e => { if (e.pointerId === jid) jend(); });
+  /* ---- look pad: drag to look, tap to switch spectated player ---- */
+  let lid = null, lx = 0, ly = 0, lt = 0, lm = 0;
+  lp.addEventListener('pointerdown', e => { e.preventDefault(); if (lid !== null) return; lid = e.pointerId; try { lp.setPointerCapture(lid); } catch (_) { } lx = e.clientX; ly = e.clientY; lt = performance.now(); lm = 0; G.Audio.init(); });
+  lp.addEventListener('pointermove', e => { if (e.pointerId !== lid) return; const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY; lm += Math.abs(dx) + Math.abs(dy); if (state.phase === 'playing' && !state.paused && !state.mapOpen) look(dx, dy); });
+  const lend = e => { if (e.pointerId !== lid) return; lid = null; if (lm < 10 && performance.now() - lt < 300 && state.spec && !G.player.alive) cycleSpec(); };
+  lp.addEventListener('pointerup', lend); lp.addEventListener('pointercancel', lend); lp.addEventListener('lostpointercapture', lend);
+  /* ---- top-right menu cluster: map / pause / sound / help ---- */
+  const mc = $('menuCluster'); mc.innerHTML = '';
+  for (const [id, ic, fn] of [['map', ICONS.map, () => act.map()], ['pause', ICONS.pause, () => act.pause()], ['sound', ICONS.sound, () => { const m = act.mute(); TB.sound.classList.toggle('muted', m); }], ['help', ICONS.help, () => act.help()]]) {
+    const b = document.createElement('div'); b.className = 'mb'; b.id = 'tb-' + id; b.innerHTML = ic; b.setAttribute('role', 'button'); b.setAttribute('aria-label', id); mc.appendChild(b); TB[id] = b; bindPtr(b, { down: fn }); }
+  TB.sound.classList.toggle('muted', !!G.Audio.muted);
+  bindPtr($('mini'), { down: () => act.map() });
+  /* ---- emote wheel: one button opens it ---- */
+  const ew = document.createElement('div'); ew.id = 'emoteWheel'; ew.className = 'hidden';
+  ew.innerHTML = '<div class="ring"></div>'; t.appendChild(ew); const ring = ew.firstChild;
+  for (const [n, l] of [['dance', 'DANCE'], ['spin', 'SPIN'], ['flex', 'FLEX'], ['wave', 'WAVE']]) { const b = document.createElement('div'); b.className = 'tb'; b.textContent = l; ring.appendChild(b); bindPtr(b, { down: () => { act.emote(n); openEmotes(false); } }); }
+  const x = document.createElement('div'); x.className = 'tb'; x.textContent = '✕'; ring.appendChild(x); bindPtr(x, { down: () => openEmotes(false) });
+  ew.addEventListener('pointerdown', e => { if (e.target === ew) openEmotes(false); });
+  G.openEmotes = openEmotes;
+}
+function openEmotes(on) { const ew = $('emoteWheel'); if (!ew) return; ew.classList.toggle('hidden', !on); if (on) { keys.KeyW = keys.KeyA = keys.KeyS = keys.KeyD = false; mouse.l = false; } }
+function sprintSync() { keys.ShiftLeft = sprintL || joyFar; if (TB.sprint) TB.sprint.classList.toggle('on', keys.ShiftLeft); }
+const setOff = (id, off) => { const e = TB[id]; if (e && tsig[id] !== off) { tsig[id] = off; e.classList.toggle('off', off); } };
+const setTxt = (id, html) => { const e = TB[id]; if (e && tsig['t' + id] !== html) { tsig['t' + id] = html; e.innerHTML = html; } };
+/* Contextual visibility: only controls that make sense for the player's current state are shown. */
+function touchUpdate() {
+  const a = G.player; if (!a) return; const alive = a.alive, ground = alive && a.state === 'ground', veh = ground && !!a.vehicle, onFoot = ground && !a.vehicle;
+  const bus = alive && a.state === 'bus' && G.bus.active, fall = alive && a.state === 'freefall';
+  for (const id of ['fire', 'aim', 'reload', 'build', 'emote', 'sprint']) setOff(id, !onFoot);
+  setOff('jump', !onFoot);
+  setOff('air', !(bus || fall)); if (bus) setTxt('air', 'DROP'); else if (fall) setTxt('air', 'GLIDE');
+  const tg = promptTarget && !state.mapOpen && ground ? promptTarget : null; setOff('use', !tg);
+  if (tg) setTxt('use', '<b>E</b><span>' + ({ chest: 'OPEN', loot: 'TAKE', veh: 'DRIVE', exit: 'EXIT', bush: a.hideLock ? 'LEAVE' : 'HIDE' }[tg.kind] || 'USE') + '</span>');
+  const bm = onFoot && !!a.buildMode; $('buildPanel').classList.toggle('hidden', !bm); TB.build.classList.toggle('on', bm);
+  if (bm) { for (const n of ['wall', 'floor', 'ramp', 'roof']) TB[n].classList.toggle('sel', a.buildType === n); const mc = G.MATS[a.buildMat]; setTxt('mat', '<b>' + a.mats[a.buildMat] + '</b>' + mc.name.toUpperCase()); TB.mat.style.borderColor = mc.css; }
+  if (!onFoot && aimOn) { aimOn = false; mouse.r = false; TB.aim.classList.remove('on'); }
+  if (!alive || (state.ended === true)) openEmotes(false);
+  if ($('progressWrap').style.display === 'block') $('prompt').style.display = 'none'; // heal/reload bar and prompt share one slot
+}
+G.touchUpdate = touchUpdate;
 
 /* ================= interaction ================= */
 let promptT = 0, promptTarget = null;
@@ -283,7 +376,7 @@ function updatePlayer(dt) {
     if (mouse.lEdge && !(it && it.type === 'weapon' && mouse.l)) { }
     a.placeCD -= 0; // handled in updateActor
   }
-  mouse.lEdge = false;
+  mouse.lEdge = false; simTick++; if (fireRel) { fireRel = false; mouse.l = false; }
 }
 let ghostShown = null;
 function updateGhost() {
@@ -306,7 +399,7 @@ function simStep(dt) {
   for (const a of G.actors) G.updateActor(a, dt);
   G.updateExtras(dt); G.updateProjectiles(dt); G.FX.update(dt); G.World.updateClouds(dt); winnerCheck();
   const p = G.player; $('busHint').style.display = p.state === 'bus' && p.alive ? 'block' : 'none';
-  const ah = $('airHint'); if (p.state === 'freefall') { ah.style.display = 'block'; ah.innerHTML = 'Free-falling — <b>W</b> dive • <b>SPACE</b> deploy glider (auto at low altitude)'; } else if (p.state === 'glide') { ah.style.display = 'block'; ah.innerHTML = 'Gliding — steer to land near buildings & loot'; } else ah.style.display = 'none';
+  const ah = $('airHint'); if (p.state === 'freefall') { ah.style.display = 'block'; ah.innerHTML = G.touchOn ? 'Free-falling — stick forward to dive • tap <b>GLIDE</b> (auto at low altitude)' : 'Free-falling — <b>W</b> dive • <b>SPACE</b> deploy glider (auto at low altitude)'; } else if (p.state === 'glide') { ah.style.display = 'block'; ah.innerHTML = 'Gliding — steer to land near buildings & loot'; } else ah.style.display = 'none';
   if (G.waypoint && Math.hypot(p.x - G.waypoint.x, p.z - G.waypoint.z) < 8) G.waypoint = null;
   promptT -= dt; if (promptT <= 0) { promptT = 0.08; promptTarget = findInteract(); const pe = $('prompt'); if (promptTarget && !state.mapOpen) { pe.style.display = 'block'; pe.innerHTML = '<kbd>E</kbd>' + promptTarget.text; pe.style.borderColor = promptTarget.color || '#fff'; } else pe.style.display = 'none'; }
 }
@@ -318,7 +411,7 @@ function frame(ts) {
   if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); renderer.render(scene, camera); return; }
   if (!state.paused && !state.helpOpen) simStep(dt);
   updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt);
-  uiT -= dt; G.UI.update(dt); G.UI.drawMini(); if (state.mapOpen) G.UI.drawBig();
+  uiT -= dt; G.UI.update(dt); if (G.touchOn) touchUpdate(); G.UI.drawMini(); if (state.mapOpen) G.UI.drawBig();
   renderer.render(scene, camera);
 }
 

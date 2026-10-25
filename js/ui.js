@@ -48,7 +48,7 @@ UI.update = function (dt) {
     el.innerHTML = inner;
   }
   // build bar / mats
-  const bb = $('buildbar'), hbx = $('hotbar'); const bm = !!p.buildMode; bb.classList.toggle('hidden', !bm); hbx.classList.toggle('hidden', bm);
+  const bb = $('buildbar'), hbx = $('hotbar'); const bm = !!p.buildMode; bb.classList.toggle('hidden', !bm || !!G.touchOn); hbx.classList.toggle('hidden', bm && !G.touchOn);
   $('cross').classList.toggle('build', bm);
   if (bm) { for (const el of bb.querySelectorAll('.bslot')) el.classList.toggle('sel', el.dataset.t === (p.buildType === 'floor' || p.buildType === 'roof' || p.buildType === 'ramp' || p.buildType === 'wall' ? p.buildType : 'wall')); for (const el of bb.querySelectorAll('.bmat')) { const m = el.dataset.m; el.classList.toggle('sel', p.buildMat === m); el.firstChild.textContent = p.mats[m]; el.style.borderColor = p.buildMat === m ? '' : ''; } }
   for (const el of $('matsBox').children) { const m = el.dataset.m; el.lastElementChild.textContent = p.mats[m]; el.classList.toggle('sel', bm && p.buildMat === m); }

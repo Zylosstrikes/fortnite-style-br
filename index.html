@@ -3,7 +3,10 @@
 <head>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%237b3fe4%27/%3E%3Cpath d=%27M16 5l3 8h8l-6.5 5 2.5 8-7-5-7 5 2.5-8L5 13h8z%27 fill=%27%23ffd23f%27/%3E%3C/svg%3E">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#79c8ff">
 <title>STORMFALL ROYALE — 3D Battle Royale</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -33,10 +36,14 @@
 
 <!-- HUD -->
 <div id="hud" class="hidden">
-  <div id="topLeft"><div class="pill" id="aliveP"><i>ALIVE</i> <b id="aliveN">35</b></div><div class="pill" id="killP"><i>ELIMS</i> <b id="killN">0</b></div></div>
+  <!-- top-left: minimap -->
+  <div id="topLeft"><canvas id="mini" width="200" height="200"></canvas></div>
+  <!-- top-center: storm timer -->
+  <div id="stormBox"><span id="stormIcon"></span><span id="stormText">Storm forming</span><b id="stormTime">1:20</b></div>
+  <!-- top-right: counters, (touch) menu cluster, killfeed -->
   <div id="topRight">
-    <canvas id="mini" width="200" height="200"></canvas>
-    <div id="stormBox"><span id="stormIcon"></span><span id="stormText">Storm forming</span><b id="stormTime">1:20</b></div>
+    <div id="counters"><div class="pill" id="aliveP"><i>ALIVE</i> <b id="aliveN">35</b></div><div class="pill" id="killP"><i>ELIMS</i> <b id="killN">0</b></div></div>
+    <div id="menuCluster" class="touchonly"></div>
     <div id="killfeed"></div>
   </div>
   <div id="cross"><i></i><i></i><i></i><i></i></div>
@@ -44,34 +51,37 @@
   <div id="scope"></div>
   <div id="dmgnums"></div>
   <div id="prompt"></div>
-  <div id="hideTag">HIDDEN IN BUSH — bots can barely see you</div><div id="campTag">CAMPFIRE — healing</div>
+  <div id="statusTags"><div id="hideTag">HIDDEN IN BUSH</div><div id="campTag">CAMPFIRE — HEALING</div></div>
   <div id="progressWrap"><div id="progressLabel"></div><div id="progress"><i></i></div></div>
   <div id="toast"></div>
   <div id="busHint">Press <b>SPACE</b> to jump from the Battle Bus!</div>
   <div id="airHint"></div>
   <div id="stormFx"></div><div id="hurtFx"></div>
+  <!-- bottom-center: ammo, health/shield, hotbar, key hints -->
   <div id="bottom">
+    <div id="ammoBox"><div id="ammoMain"></div><div id="ammoRes"></div><div id="ammoAll"></div></div>
     <div id="bars"><div class="bar sh"><i id="shBar"></i><b id="shTxt">0</b></div><div class="bar hp"><i id="hpBar"></i><b id="hpTxt">100</b></div></div>
     <div id="hotbar"></div>
     <div id="buildbar" class="hidden"></div>
+    <div id="keyHints" class="deskonly"><span><kbd>WASD</kbd>move</span><span><kbd>SHIFT</kbd>sprint</span><span><kbd>SPACE</kbd>jump</span><span><kbd>E</kbd>use</span><span><kbd>R</kbd>reload</span><span><kbd>Q</kbd><kbd>F</kbd><kbd>Z</kbd><kbd>C</kbd>build</span><span><kbd>G</kbd>mat</span><span><kbd>X</kbd>edit</span><span><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>emote</span><span><kbd>M</kbd>map</span><span><kbd>H</kbd>help</span><span><kbd>N</kbd>mute</span></div>
   </div>
+  <!-- bottom-left (desktop): materials -->
   <div id="matsBox"></div>
-  <div id="ammoBox"><div id="ammoMain"></div><div id="ammoRes"></div><div id="ammoAll"></div></div>
-  <div id="emoteWheel"><span>T Dance</span><span>Y Wave</span><span>U Flex</span><span>I Spin</span></div>
 </div>
 
 <!-- FULL MAP -->
-<div id="mapScreen" class="hidden"><div class="maptitle">ISLAND MAP <small>click to place a waypoint • M to close</small></div><canvas id="bigmap" width="720" height="720"></canvas></div>
+<div id="mapScreen" class="hidden"><div class="maptitle">ISLAND MAP <small><span class="deskonly">click to place a waypoint • M to close</span><span class="touchonly">tap to place a waypoint</span></small></div><canvas id="bigmap" width="720" height="720"></canvas><button id="mapClose" class="smallbtn">CLOSE MAP</button></div>
 
 <!-- HELP -->
 <div id="help" class="hidden">
   <div class="panel">
     <h2>CONTROLS</h2>
     <div class="cols">
-      <div><h3>Movement</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint</p><p><kbd>SPACE</kbd> jump / leave bus / open glider</p><p>Mouse — look &nbsp; <kbd>LMB</kbd> shoot / harvest / use</p><p><kbd>RMB</kbd> aim down sights (scope)</p><p><kbd>E</kbd> interact (chest, pick up, vehicle)</p></div>
-      <div><h3>Items</h3><p><kbd>1</kbd> pickaxe &nbsp; <kbd>2</kbd>–<kbd>6</kbd> item slots</p><p><kbd>Wheel</kbd> cycle slots &nbsp; <kbd>R</kbd> reload</p><p>Hold <kbd>LMB</kbd> with a heal item to use it</p><p>Pickaxe: hit trees, rocks &amp; buildings for wood / stone / metal</p></div>
-      <div><h3>Building</h3><p><kbd>Q</kbd> wall &nbsp; <kbd>F</kbd> floor &nbsp; <kbd>Z</kbd> ramp &nbsp; <kbd>C</kbd> roof</p><p><kbd>LMB</kbd> place (hold to spam) &nbsp; <kbd>G</kbd> cycle material</p><p><kbd>X</kbd> edit wall: solid → door → window</p><p>Press a weapon slot (<kbd>1</kbd>–<kbd>6</kbd>) to leave build mode</p></div>
-      <div><h3>Other</h3><p><kbd>M</kbd> map &nbsp; <kbd>H</kbd> this help &nbsp; <kbd>N</kbd> mute</p><p>Emotes: <kbd>T</kbd> dance <kbd>Y</kbd> wave <kbd>U</kbd> flex <kbd>I</kbd> spin</p><p><kbd>ESC</kbd> release mouse / pause</p><p>Stay inside the white circle — the purple storm hurts!</p><p>Bushes: walk in or press <kbd>E</kbd> to hide • Campfires heal • Rifts launch you skyward</p><p>LMB with TNT = throw • with a trap = place (Launch Pad bounces you up)</p><p>Supply Llama &amp; armored trucks hold the best loot</p></div>
+      <div class="touchonly"><h3>Touch controls</h3><p>Left stick — move (push to the edge to sprint)</p><p>Drag anywhere on the right — look</p><p><b>FIRE</b> shoot / harvest / place • <b>AIM</b> scope • <b>JUMP</b> • <b>SPRINT</b> toggle</p><p><b>BUILD</b> opens the build panel: wall, floor, ramp, roof, material, edit</p><p><b>EMOTE</b> opens the emote wheel • tap hotbar slots to switch items</p><p>Top-right: map, pause, sound, help</p></div>
+      <div class="deskonly"><h3>Movement</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint</p><p><kbd>SPACE</kbd> jump / leave bus / open glider</p><p>Mouse — look &nbsp; <kbd>LMB</kbd> shoot / harvest / use</p><p><kbd>RMB</kbd> aim down sights (scope)</p><p><kbd>E</kbd> interact (chest, pick up, vehicle)</p></div>
+      <div class="deskonly"><h3>Items</h3><p><kbd>1</kbd> pickaxe &nbsp; <kbd>2</kbd>–<kbd>6</kbd> item slots</p><p><kbd>Wheel</kbd> cycle slots &nbsp; <kbd>R</kbd> reload</p><p>Hold <kbd>LMB</kbd> with a heal item to use it</p><p>Pickaxe: hit trees, rocks &amp; buildings for wood / stone / metal</p></div>
+      <div class="deskonly"><h3>Building</h3><p><kbd>Q</kbd> wall &nbsp; <kbd>F</kbd> floor &nbsp; <kbd>Z</kbd> ramp &nbsp; <kbd>C</kbd> roof</p><p><kbd>LMB</kbd> place (hold to spam) &nbsp; <kbd>G</kbd> cycle material</p><p><kbd>X</kbd> edit wall: solid → door → window</p><p>Press a weapon slot (<kbd>1</kbd>–<kbd>6</kbd>) to leave build mode</p></div>
+      <div><h3>Other</h3><p class="deskonly"><kbd>M</kbd> map &nbsp; <kbd>H</kbd> this help &nbsp; <kbd>N</kbd> mute</p><p class="deskonly">Emotes: <kbd>T</kbd> dance <kbd>Y</kbd> wave <kbd>U</kbd> flex <kbd>I</kbd> spin</p><p class="deskonly"><kbd>ESC</kbd> release mouse / pause</p><p>Stay inside the white circle — the purple storm hurts!</p><p>Bushes: walk in or press <kbd>E</kbd> to hide • Campfires heal • Rifts launch you skyward</p><p>LMB with TNT = throw • with a trap = place (Launch Pad bounces you up)</p><p>Supply Llama &amp; armored trucks hold the best loot</p></div>
     </div>
     <button id="helpClose" class="smallbtn">CLOSE</button>
   </div>
@@ -84,6 +94,7 @@
   <div id="lvlBadge" class="hidden"><svg viewBox="0 0 120 140" width="120" height="140"><defs><linearGradient id="lbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c13cff"/><stop offset="1" stop-color="#3fd0ff"/></linearGradient><linearGradient id="lfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1670"/><stop offset="1" stop-color="#14082e"/></linearGradient></defs><path d="M14 10 H106 V80 Q106 106 60 130 Q14 106 14 80 Z" fill="url(#lfill)" stroke="url(#lbg)" stroke-width="7" stroke-linejoin="round"/><path d="M60 24 L90 58 H71 V92 H49 V58 H30 Z" fill="#fff"/></svg><div class="lvlUp">LEVEL UP!</div><div class="lvlBn">LEVEL <b id="lvlBadgeNum">2</b></div></div><div class="row"><button id="againBtn" class="bigbtn">PLAY AGAIN</button><button id="specBtn" class="smallbtn">SPECTATE</button></div></div><div id="confetti"></div></div>
 
 <div id="loading"><div class="logo"><span>STORMFALL</span><b>ROYALE</b></div><div id="loadMsg">Generating island…</div></div>
+<div id="lookpad" class="hidden"></div>
 <div id="touch" class="hidden"></div>
 <div id="errbox"></div>
 
