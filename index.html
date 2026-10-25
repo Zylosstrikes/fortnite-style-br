@@ -27,9 +27,11 @@
     <div id="lvlBox"><div class="lvlN"><i>LV</i><b id="lvlNum">1</b></div><div class="lvlR"><div class="lvlBar"><i id="lvlFill"></i></div><span id="lvlTxt">0 / 120 XP</span></div></div>
     <label class="lbl">SETTINGS</label>
     <div class="row"><label><input type="checkbox" id="optShadow" checked> Shadows</label><label><input type="checkbox" id="optSound" checked> Sound</label></div>
+    <label class="lbl">LOOK / CAMERA</label>
+    <div id="lookSetLobby"></div>
     <button id="playBtn" class="bigbtn">PLAY</button>
     <button id="helpBtn" class="smallbtn">CONTROLS (H)</button>
-    <div class="hint">Click PLAY, then click the game to capture the mouse. Press <b>H</b> anytime for controls.</div>
+    <div class="hint">Click PLAY, then click the game to capture the mouse (if the browser blocks that, just click &amp; drag to look). Drag on the island view to rotate it. Press <b>H</b> anytime for controls.</div>
   </div>
   <div class="lobby-right"><div id="lobbyInfo"></div></div>
 </div>
@@ -63,22 +65,22 @@
     <div id="bars"><div class="bar sh"><i id="shBar"></i><b id="shTxt">0</b></div><div class="bar hp"><i id="hpBar"></i><b id="hpTxt">100</b></div></div>
     <div id="hotbar"></div>
     <div id="buildbar" class="hidden"></div>
-    <div id="keyHints" class="deskonly"><span><kbd>WASD</kbd>move</span><span><kbd>SHIFT</kbd>sprint</span><span><kbd>SPACE</kbd>jump</span><span><kbd>E</kbd>use</span><span><kbd>R</kbd>reload</span><span><kbd>Q</kbd><kbd>F</kbd><kbd>Z</kbd><kbd>C</kbd>build</span><span><kbd>G</kbd>mat</span><span><kbd>X</kbd>edit</span><span><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>emote</span><span><kbd>M</kbd>map</span><span><kbd>H</kbd>help</span><span><kbd>N</kbd>mute</span></div>
+    <div id="keyHints" class="deskonly"><span><kbd>WASD</kbd>move</span><span><kbd>SHIFT</kbd>sprint</span><span><kbd>SPACE</kbd>jump</span><span><kbd>E</kbd>use</span><span><kbd>R</kbd>reload</span><span><kbd>Q</kbd><kbd>F</kbd><kbd>Z</kbd><kbd>C</kbd>build</span><span><kbd>G</kbd>mat</span><span><kbd>X</kbd>edit</span><span><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>emote</span><span><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd>look</span><span><kbd>M</kbd>map</span><span><kbd>H</kbd>help</span><span><kbd>N</kbd>mute</span></div>
   </div>
   <!-- bottom-left (desktop): materials -->
   <div id="matsBox"></div>
 </div>
 
 <!-- FULL MAP -->
-<div id="mapScreen" class="hidden"><div class="maptitle">ISLAND MAP <small><span class="deskonly">click to place a waypoint • M to close</span><span class="touchonly">tap to place a waypoint</span></small></div><canvas id="bigmap" width="720" height="720"></canvas><button id="mapClose" class="smallbtn">CLOSE MAP</button></div>
+<div id="mapScreen" class="hidden"><div class="maptitle">ISLAND MAP <small><span class="deskonly">click to place a waypoint • drag to pan • wheel to zoom • M to close</span><span class="touchonly">tap to place a waypoint • drag to pan • pinch to zoom</span></small></div><canvas id="bigmap" width="720" height="720"></canvas><div class="mapctl"><button id="mapZoomOut" class="smallbtn" aria-label="Zoom out">&minus;</button><button id="mapReset" class="smallbtn">RESET</button><button id="mapZoomIn" class="smallbtn" aria-label="Zoom in">+</button><button id="mapClose" class="smallbtn">CLOSE MAP</button></div></div>
 
 <!-- HELP -->
 <div id="help" class="hidden">
   <div class="panel">
     <h2>CONTROLS</h2>
     <div class="cols">
-      <div class="touchonly"><h3>Touch controls</h3><p>Left stick — move (push to the edge to sprint)</p><p>Drag anywhere on the right — look</p><p><b>FIRE</b> shoot / harvest / place • <b>AIM</b> scope • <b>JUMP</b> • <b>SPRINT</b> toggle</p><p><b>BUILD</b> opens the build panel: wall, floor, ramp, roof, material, edit</p><p><b>EMOTE</b> opens the emote wheel • tap hotbar slots to switch items</p><p>Top-right: map, pause, sound, help</p></div>
-      <div class="deskonly"><h3>Movement</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint</p><p><kbd>SPACE</kbd> jump / leave bus / open glider</p><p>Mouse — look &nbsp; <kbd>LMB</kbd> shoot / harvest / use</p><p><kbd>RMB</kbd> aim down sights (scope)</p><p><kbd>E</kbd> interact (chest, pick up, vehicle)</p></div>
+      <div class="touchonly"><h3>Touch controls</h3><p>Left stick — move (push to the edge to sprint)</p><p>Drag any free part of the screen — look (sensitivity in the pause menu). You can look while moving or firing</p><p><b>FIRE</b> shoot / harvest / place • <b>AIM</b> scope • <b>JUMP</b> • <b>SPRINT</b> toggle</p><p><b>BUILD</b> opens the build panel: wall, floor, ramp, roof, material, edit</p><p><b>EMOTE</b> opens the emote wheel • tap hotbar slots to switch items</p><p>Top-right: map, pause, sound, help</p></div>
+      <div class="deskonly"><h3>Movement</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint</p><p><kbd>SPACE</kbd> jump / leave bus / open glider</p><p>Mouse — look (or click &amp; drag if the browser blocks mouse capture) &nbsp; <kbd>Arrows</kbd> look &nbsp; <kbd>LMB</kbd> shoot / harvest / use</p><p><kbd>RMB</kbd> aim down sights (scope)</p><p><kbd>E</kbd> interact (chest, pick up, vehicle)</p></div>
       <div class="deskonly"><h3>Items</h3><p><kbd>1</kbd> pickaxe &nbsp; <kbd>2</kbd>–<kbd>6</kbd> item slots</p><p><kbd>Wheel</kbd> cycle slots &nbsp; <kbd>R</kbd> reload</p><p>Hold <kbd>LMB</kbd> with a heal item to use it</p><p>Pickaxe: hit trees, rocks &amp; buildings for wood / stone / metal</p></div>
       <div class="deskonly"><h3>Building</h3><p><kbd>Q</kbd> wall &nbsp; <kbd>F</kbd> floor &nbsp; <kbd>Z</kbd> ramp &nbsp; <kbd>C</kbd> roof</p><p><kbd>LMB</kbd> place (hold to spam) &nbsp; <kbd>G</kbd> cycle material</p><p><kbd>X</kbd> edit wall: solid → door → window</p><p>Press a weapon slot (<kbd>1</kbd>–<kbd>6</kbd>) to leave build mode</p></div>
       <div><h3>Other</h3><p class="deskonly"><kbd>M</kbd> map &nbsp; <kbd>H</kbd> this help &nbsp; <kbd>N</kbd> mute</p><p class="deskonly">Emotes: <kbd>T</kbd> dance <kbd>Y</kbd> wave <kbd>U</kbd> flex <kbd>I</kbd> spin</p><p class="deskonly"><kbd>ESC</kbd> release mouse / pause</p><p>Stay inside the white circle — the purple storm hurts!</p><p>Bushes: walk in or press <kbd>E</kbd> to hide • Campfires heal • Rifts launch you skyward</p><p>LMB with TNT = throw • with a trap = place (Launch Pad bounces you up)</p><p>Supply Llama &amp; armored trucks hold the best loot</p></div>
@@ -87,7 +89,7 @@
   </div>
 </div>
 
-<div id="pause" class="hidden"><div class="panel"><h2>PAUSED</h2><p>Click to capture the mouse and resume.</p><button id="resumeBtn" class="bigbtn">RESUME</button><button id="helpBtn2" class="smallbtn">CONTROLS</button></div></div>
+<div id="pause" class="hidden"><div class="panel"><h2>PAUSED</h2><p>Click to capture the mouse and resume.</p><div id="lookSetPause"></div><button id="resumeBtn" class="bigbtn">RESUME</button><button id="helpBtn2" class="smallbtn">CONTROLS</button></div></div>
 
 <!-- END SCREEN -->
 <div id="end" class="hidden"><div id="endBox"><img id="crownImg" alt="Victory Crown" style="display:none"><div id="endTitle"></div><div id="endSub"></div><div id="endStats"></div><div id="xpBox" style="display:none"></div>

@@ -4,7 +4,21 @@
 const G = window.G; const $ = id => document.getElementById(id);
 const UI = G.UI = { skinColor: G.SKIN_COLORS[5], pick: (function () { try { const p = localStorage.getItem('sf_pick'); if (G.PICKAXES.some(x => x.id === p)) return p; } catch (e) { } return 'pick'; })() };
 let toastT = 0, sigs = {};
+/* ---------- look settings (sensitivity, invert-Y, pitch limit), saved in localStorage ---------- */
+const LS_DEF = { sens: 1, invertY: false, pitch: 80 };
+G.settings = (function () { const s = Object.assign({}, LS_DEF); try { const j = JSON.parse(localStorage.getItem('sf_look') || '{}'); if (typeof j.sens === 'number') s.sens = Math.min(3, Math.max(0.25, j.sens)); if (typeof j.invertY === 'boolean') s.invertY = j.invertY; if (typeof j.pitch === 'number') s.pitch = Math.min(89, Math.max(40, j.pitch)); } catch (e) { } return s; })();
+UI.saveSettings = function () { try { localStorage.setItem('sf_look', JSON.stringify(G.settings)); } catch (e) { } };
+UI.refreshSettings = function () { const S = G.settings; document.querySelectorAll('.lookset').forEach(h => { h.querySelectorAll('input').forEach(i => { const k = i.dataset.k; if (i.type === 'checkbox') i.checked = !!S[k]; else i.value = S[k]; const v = h.querySelector('[data-v=' + k + ']'); if (v) v.textContent = k === 'sens' ? S.sens.toFixed(2) + 'x' : S.pitch + '\u00b0'; }); }); };
+UI.buildLookSettings = function (host) {
+  if (!host) return; host.className = 'lookset';
+  host.innerHTML = '<div class="lsrow"><label>LOOK SENSITIVITY</label><input type="range" data-k="sens" min="0.25" max="3" step="0.05"><b data-v="sens"></b></div>' +
+    '<div class="lsrow"><label>LOOK UP/DOWN LIMIT</label><input type="range" data-k="pitch" min="40" max="89" step="1"><b data-v="pitch"></b></div>' +
+    '<label class="lschk"><input type="checkbox" data-k="invertY"> Invert Y (push up to look down)</label>';
+  host.querySelectorAll('input').forEach(i => { const on = () => { const k = i.dataset.k; G.settings[k] = i.type === 'checkbox' ? i.checked : parseFloat(i.value); UI.saveSettings(); UI.refreshSettings(); if (G.onSettings) G.onSettings(); }; i.addEventListener('input', on); i.addEventListener('change', on); });
+  UI.refreshSettings();
+};
 UI.init = function () {
+  UI.buildLookSettings($('lookSetLobby')); UI.buildLookSettings($('lookSetPause'));
   const sw = $('swatches'); G.SKIN_COLORS.forEach((c, i) => { const d = document.createElement('div'); d.className = 'sw' + (i === 5 ? ' sel' : ''); d.style.background = '#' + c.toString(16).padStart(6, '0'); d.onclick = () => { UI.skinColor = c; [...sw.children].forEach(x => x.classList.remove('sel')); d.classList.add('sel'); G.Audio.init(); G.Audio.play('click'); }; sw.appendChild(d); });
   const pr = $('pickRow'); G.PICKAXES.forEach(px => { const d = document.createElement('div'); d.className = 'pk' + (px.id === UI.pick ? ' sel' : ''); d.dataset.id = px.id; const url = G.itemIconURL({ type: 'pickaxe', pick: px.id }); d.innerHTML = (url ? '<img src="' + url + '">' : '') + '<span>' + px.name + '</span>'; d.onclick = () => { UI.pick = px.id; try { localStorage.setItem('sf_pick', px.id); } catch (e) { } [...pr.children].forEach(x => x.classList.toggle('sel', x === d)); G.Audio.init(); G.Audio.play('click'); }; pr.appendChild(d); });
   UI.refreshLevel();
@@ -93,21 +107,28 @@ UI.drawMini = function () {
   c.restore();
 };
 /* ---------- big map ---------- */
+/* full map: pan by drag, zoom by pinch / wheel / buttons. View origin (x,y) is in unzoomed canvas px. */
+UI.mapView = { z: 1, x: 0, y: 0 };
+UI.mapClamp = function () { const v = UI.mapView, S = 720; v.z = Math.min(6, Math.max(1, v.z)); v.x = Math.min(S - S / v.z, Math.max(0, v.x)); v.y = Math.min(S - S / v.z, Math.max(0, v.y)); };
+UI.mapZoomAt = function (f, cx, cy) { const v = UI.mapView, nz = Math.min(6, Math.max(1, v.z * f)); const wx = v.x + cx / v.z, wy = v.y + cy / v.z; v.z = nz; v.x = wx - cx / nz; v.y = wy - cy / nz; UI.mapClamp(); };
+UI.mapPan = function (dx, dy) { const v = UI.mapView; v.x -= dx / v.z; v.y -= dy / v.z; UI.mapClamp(); };
+UI.mapReset = function () { UI.mapView.z = 1; UI.mapView.x = 0; UI.mapView.y = 0; };
 UI.drawBig = function () {
   const cv = $('bigmap'), c = cv.getContext('2d'), S = cv.width, k = S / G.MAPSZ; const p = G.view || G.player; const src = G.World.mapCanvas; if (!src) return;
-  c.clearRect(0, 0, S, S); c.drawImage(src, 0, 0, S, S); const wx = x => (x + G.HALF) * k, wz = z => (z + G.HALF) * k;
+  const Z = UI.mapView.z; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, S, S); c.setTransform(Z, 0, 0, Z, -UI.mapView.x * Z, -UI.mapView.y * Z); c.drawImage(src, 0, 0, S, S); const wx = x => (x + G.HALF) * k, wz = z => (z + G.HALF) * k;
   const St = G.storm; if (St) { c.save(); c.beginPath(); c.rect(0, 0, S, S); c.arc(wx(St.cx), wz(St.cz), St.r * k, 0, 6.2832, true); c.fillStyle = 'rgba(150,50,255,.45)'; c.fill('evenodd'); c.restore(); c.strokeStyle = '#e9d0ff'; c.lineWidth = 3; c.beginPath(); c.arc(wx(St.cx), wz(St.cz), St.r * k, 0, 6.2832); c.stroke(); if (St.stage !== 'done') { c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.arc(wx(St.nx), wz(St.nz), St.nr * k, 0, 6.2832); c.stroke(); } }
   const B = G.bus; if (B && B.active) { c.strokeStyle = 'rgba(255,230,80,.9)'; c.setLineDash([10, 8]); c.lineWidth = 3; c.beginPath(); c.moveTo(wx(B.sx), wz(B.sz)); c.lineTo(wx(B.ex), wz(B.ez)); c.stroke(); c.setLineDash([]); c.fillStyle = '#ffd83a'; c.beginPath(); c.arc(wx(B.x), wz(B.z), 9, 0, 6.3); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 2; c.stroke(); }
-  c.font = 'bold 15px Trebuchet MS, Arial'; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = 'rgba(0,0,0,.8)'; c.fillStyle = '#fff';
+  c.font = 'bold ' + 15 / Z + 'px Trebuchet MS, Arial'; c.textAlign = 'center'; c.lineWidth = 4 / Z; c.strokeStyle = 'rgba(0,0,0,.8)'; c.fillStyle = '#fff';
   for (const q of G.POIS) { c.strokeText(q.name, wx(q.x), wz(q.z) - 8); c.fillText(q.name, wx(q.x), wz(q.z) - 8); c.fillStyle = '#ffe36a'; c.beginPath(); c.arc(wx(q.x), wz(q.z), 4, 0, 6.3); c.fill(); c.fillStyle = '#fff'; }
-  c.font = 'italic 13px Trebuchet MS, Arial'; c.fillStyle = '#e8f6ff'; for (const q of G.REGIONS) { c.strokeText(q.name, wx(q.x), wz(q.z)); c.fillText(q.name, wx(q.x), wz(q.z)); }
+  c.font = 'italic ' + 13 / Z + 'px Trebuchet MS, Arial'; c.fillStyle = '#e8f6ff'; for (const q of G.REGIONS) { c.strokeText(q.name, wx(q.x), wz(q.z)); c.fillText(q.name, wx(q.x), wz(q.z)); }
   for (const v of G.vehicles) { if (v.driver) continue; c.fillStyle = '#ff7a3a'; c.fillRect(wx(v.x) - 3, wz(v.z) - 3, 6, 6); }
   if (G.Extras) { for (const q of G.Extras.camps) { c.fillStyle = '#ff8a2a'; c.beginPath(); c.arc(wx(q.x), wz(q.z), 4, 0, 6.3); c.fill(); c.strokeStyle = '#000'; c.lineWidth = 1; c.stroke(); } for (const q of G.Extras.rifts) { c.fillStyle = '#b8a8ff'; c.beginPath(); c.moveTo(wx(q.x), wz(q.z) - 7); c.lineTo(wx(q.x) + 5, wz(q.z)); c.lineTo(wx(q.x), wz(q.z) + 7); c.lineTo(wx(q.x) - 5, wz(q.z)); c.fill(); c.stroke(); }
-    for (const ch of G.chests) { if (ch.opened || (ch.kind !== 'llama' && ch.kind !== 'truck')) continue; c.fillStyle = ch.kind === 'llama' ? '#ff5fb0' : '#c08aff'; c.beginPath(); c.arc(wx(ch.x), wz(ch.z), ch.kind === 'llama' ? 8 : 6, 0, 6.3); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#fff'; c.font = 'bold 12px Trebuchet MS'; c.textAlign = 'center'; c.fillText(ch.kind === 'llama' ? 'LLAMA' : 'TRUCK', wx(ch.x), wz(ch.z) - 11); } }
+    for (const ch of G.chests) { if (ch.opened || (ch.kind !== 'llama' && ch.kind !== 'truck')) continue; c.fillStyle = ch.kind === 'llama' ? '#ff5fb0' : '#c08aff'; c.beginPath(); c.arc(wx(ch.x), wz(ch.z), ch.kind === 'llama' ? 8 : 6, 0, 6.3); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#fff'; c.font = 'bold ' + 12 / Z + 'px Trebuchet MS'; c.textAlign = 'center'; c.fillText(ch.kind === 'llama' ? 'LLAMA' : 'TRUCK', wx(ch.x), wz(ch.z) - 11); } }
   if (G.waypoint) { c.fillStyle = '#4de3ff'; c.beginPath(); c.moveTo(wx(G.waypoint.x), wz(G.waypoint.z) + 4); c.lineTo(wx(G.waypoint.x) - 8, wz(G.waypoint.z) - 14); c.lineTo(wx(G.waypoint.x) + 8, wz(G.waypoint.z) - 14); c.fill(); }
   if (p && p.state !== 'bus') { c.save(); c.translate(wx(p.x), wz(p.z)); c.rotate(Math.atan2(-Math.cos(p.yaw), -Math.sin(p.yaw)) + Math.PI / 2); c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, -13); c.lineTo(10, 11); c.lineTo(0, 6); c.lineTo(-10, 11); c.closePath(); c.fill(); c.stroke(); c.restore(); }
+  c.setTransform(1, 0, 0, 1, 0, 0);
 };
-UI.bigClick = function (e) { const cv = $('bigmap'), r = cv.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * G.MAPSZ - G.HALF, z = (e.clientY - r.top) / r.height * G.MAPSZ - G.HALF; G.waypoint = { x, z }; G.Audio.play('click'); UI.toast('Waypoint set', 900, true); };
+UI.bigClick = function (e) { const cv = $('bigmap'), r = cv.getBoundingClientRect(), v = UI.mapView, S = cv.width; const cx = (e.clientX - r.left) / r.width * S, cy = (e.clientY - r.top) / r.height * S; const x = (v.x + cx / v.z) / S * G.MAPSZ - G.HALF, z = (v.y + cy / v.z) / S * G.MAPSZ - G.HALF; G.waypoint = { x, z }; G.Audio.play('click'); UI.toast('Waypoint set', 900, true); };
 
 /* ---------- end screens ---------- */
 UI.showEnd = function (win, pl, byName, canSpec) {

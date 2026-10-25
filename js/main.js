@@ -7,6 +7,12 @@ const state = G.state = { phase: 'loading', paused: false, mapOpen: false, helpO
 let renderer, scene, camera, sun, sky, sunDisc, stormMesh, stormMat, lootViz = [], ghost = {}, lastT = 0, orbit = Math.random() * 6;
 const keys = G.keys = {}; const mouse = { l: false, r: false, lEdge: false }; let yaw = 0, pitch = 0, fovCur = 72;
 G.setLook = (y, p) => { yaw = y; pitch = p; };
+/* One look path for mouse, touch and arrow keys: sensitivity, invert-Y and pitch limit all live here. */
+const LS = G.settings; let lobbyYaw = 0, lobbyElev = 0;
+const pitchMax = () => LS.pitch * Math.PI / 180;
+function lookBy(dx, dy, base) { const z = G.scoped ? 0.35 : mouse.r ? 0.7 : 1, k = base * LS.sens * z; yaw -= dx * k; pitch = G.clamp(pitch - dy * k * (LS.invertY ? -1 : 1), -pitchMax(), pitchMax()); }
+G.lookBy = lookBy; G.onSettings = () => { pitch = G.clamp(pitch, -pitchMax(), pitchMax()); };
+let dragging = false, dragX = 0, dragY = 0, dragMoved = 0, dragT = 0, everLocked = false; const dragMode = () => NOLOCK || !!G.lockFailed || !$('c').requestPointerLock;
 window.addEventListener('error', e => { const b = $('errbox'); b.style.display = 'block'; b.textContent = 'Error: ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'; });
 
 /* ================= init ================= */
@@ -80,10 +86,13 @@ function startMatch() {
   if (G.touchOn) { $('touch').classList.remove('hidden'); $('lookpad').classList.remove('hidden'); $('busHint').innerHTML = 'Tap <b>DROP</b> to jump from the Battle Bus!'; $('pause').querySelector('p').textContent = 'Tap RESUME to keep playing.'; layoutTouch(); }
 }
 const UI = () => G.UI;
-function lock() { if (NOLOCK) return; const c = $('c'); try { const p = c.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
+function lock() { if (NOLOCK || G.touchOn) return; const c = $('c'); if (!c.requestPointerLock) { lockFailed(); return; } try { const p = c.requestPointerLock(); if (p && p.catch) p.catch(lockFailed); } catch (e) { lockFailed(); } }
+/* If the browser never grants pointer lock (iframe, permissions, old browser) fall back to click-and-drag look. */
+function lockFailed() { if (everLocked || G.lockFailed || G.touchOn) return; G.lockFailed = true; if (state.phase === 'playing') G.UI.toast('Mouse capture unavailable — click & drag to look', 3200, true); }
+document.addEventListener('pointerlockerror', lockFailed);
 document.addEventListener('pointerlockchange', () => {
-  const locked = document.pointerLockElement === $('c');
-  if (state.phase === 'playing' && !locked && !state.mapOpen && !state.helpOpen && !state.ended && !G.touchOn && !NOLOCK) { state.paused = true; $('pause').classList.remove('hidden'); }
+  const locked = document.pointerLockElement === $('c'); if (locked) { everLocked = true; G.lockFailed = false; }
+  if (state.phase === 'playing' && !locked && !state.mapOpen && !state.helpOpen && !state.ended && !G.touchOn && !NOLOCK && !G.lockFailed) { state.paused = true; $('pause').classList.remove('hidden'); }
   else if (locked) { state.paused = false; $('pause').classList.add('hidden'); }
 });
 G.hooks.death = function (a, killer, wname) {
@@ -121,7 +130,7 @@ const act = {
 G.act = act;
 function toggleMap() {
   if (state.phase !== 'playing' || state.ended) return; state.mapOpen = !state.mapOpen; $('mapScreen').classList.toggle('hidden', !state.mapOpen);
-  if (state.mapOpen) { if (document.exitPointerLock) document.exitPointerLock(); } else lock();
+  if (state.mapOpen) { G.UI.mapReset(); if (document.exitPointerLock) document.exitPointerLock(); } else lock();
 }
 function toggleHelp(force) {
   const open = force !== undefined ? force : !state.helpOpen; state.helpOpen = open; $('help').classList.toggle('hidden', !open);
@@ -132,6 +141,7 @@ function bindInput() {
     if (e.target && e.target.tagName === 'INPUT') { if (e.code === 'Enter') startMatch(); return; }
     if (e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault(); const first = !keys[e.code]; keys[e.code] = true;
     if (!first) return; G.Audio.init();
+    if (e.code === 'Escape' && state.phase === 'playing' && !G.touchOn && dragMode() && !state.mapOpen && !state.helpOpen && !state.ended) { if (state.paused) { $('resumeBtn').click(); } else act.pause(); return; }
     if (e.code === 'KeyH') { toggleHelp(); return; } if (e.code === 'KeyN') { const m = G.Audio.toggleMute(); G.UI.toast(m ? 'Sound off' : 'Sound on', 800, true); return; }
     if (state.phase !== 'playing') return; if (e.code === 'KeyM') { act.map(); return; } if (state.paused || state.ended === true && !G.player.alive && false) return;
     if (!G.player.alive) return;
@@ -148,15 +158,26 @@ function bindInput() {
   const cv = $('c');
   window.addEventListener('mousedown', e => {
     if (e.target.closest && e.target.closest('#lobby,#help,#end,#mapScreen,#pause,.slot')) return; if (G.touchOn && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return; G.Audio.init();
-    if (state.phase !== 'playing' || state.paused) return; if (!NOLOCK && !G.touchOn && document.pointerLockElement !== cv) { lock(); return; }
+    if (state.phase !== 'playing' || state.paused) return; if (!dragMode() && !G.touchOn && document.pointerLockElement !== cv) { lock(); return; }
     if (state.spec && !G.player.alive) { if (e.button === 0) cycleSpec(); return; }
+    if (dragMode() && !G.touchOn && document.pointerLockElement !== cv) {
+      // click-and-drag look: a quick click shoots, holding still fires, moving the mouse while pressed turns the camera
+      dragging = true; dragX = e.clientX; dragY = e.clientY; dragMoved = 0;
+      if (e.button === 0) { clearTimeout(dragT); dragT = setTimeout(() => { dragT = 0; if (dragging && dragMoved < 6) { mouse.l = true; mouse.lEdge = true; } }, 150); }
+      if (e.button === 2) mouse.r = true; return;
+    }
     if (e.button === 0) { mouse.l = true; mouse.lEdge = true; } if (e.button === 2) mouse.r = true;
   });
-  window.addEventListener('mouseup', e => { if (e.button === 0) mouse.l = false; if (e.button === 2) mouse.r = false; });
+  window.addEventListener('mouseup', e => {
+    if (dragging && e.button === 0 && dragT) { clearTimeout(dragT); dragT = 0; if (dragMoved < 6) { mouse.l = true; mouse.lEdge = true; fireRel = true; } }  // quick click = one shot
+    if (e.button === 0 && !fireRel) mouse.l = false; if (e.button === 2) mouse.r = false; if (!e.buttons) dragging = false;
+  });
   window.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('mousemove', e => {
-    if (state.phase !== 'playing' || state.paused || state.mapOpen || (!NOLOCK && document.pointerLockElement !== cv)) return;
-    const s = 0.0022 * (G.scoped ? 0.3 : mouse.r ? 0.7 : 1); yaw -= e.movementX * s; pitch = G.clamp(pitch - e.movementY * s, -1.45, 1.45);
+    if (state.phase !== 'playing' || state.paused || state.mapOpen) return;
+    if (G.touchOn && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+    if (document.pointerLockElement === cv) { lookBy(e.movementX, e.movementY, 0.0022); return; }
+    if (dragging && dragMode()) { const dx = e.clientX - dragX, dy = e.clientY - dragY; dragX = e.clientX; dragY = e.clientY; dragMoved += Math.abs(dx) + Math.abs(dy); if (dragMoved >= 6 && dragT) { clearTimeout(dragT); dragT = 0; } lookBy(dx, dy, 0.0022); }
   });
   window.addEventListener('wheel', e => { if (state.phase !== 'playing' || state.paused || state.mapOpen) return; act.cycle(e.deltaY > 0 ? 1 : -1); }, { passive: true });
   $('playBtn').onclick = () => { G.Audio.init(); G.Audio.play('click'); startMatch(); };
@@ -165,13 +186,36 @@ function bindInput() {
   $('pause').addEventListener('click', e => { if (e.target.id === 'pause') { lock(); } });
   $('againBtn').onclick = () => { sessionStorage.setItem('sf_auto', '1'); location.reload(); };
   $('specBtn').onclick = () => { G.UI.hideEnd(); state.ended = 'spectating'; if (!state.spec) state.spec = G.actors.find(a => a.alive) || null; G.UI.toast('Spectating — click to switch player', 2500, true); lock(); };
-  $('bigmap').addEventListener('click', e => G.UI.bigClick(e)); $('mapClose').onclick = () => toggleMap();
+  initMapInput(); $('mapClose').onclick = () => toggleMap();
+  initLobbyDrag();
   document.addEventListener('gesturestart', e => e.preventDefault()); document.addEventListener('dblclick', e => e.preventDefault());
   document.addEventListener('touchmove', e => { if (e.touches.length > 1 || !(e.target.closest && e.target.closest('.lobby-left,.panel'))) e.preventDefault(); }, { passive: false });
   $('optShadow').onchange = e => { renderer.shadowMap.enabled = e.target.checked; sun.castShadow = e.target.checked; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); };
   $('optSound').onchange = e => { if (G.Audio.muted === e.target.checked) G.Audio.toggleMute(); };
   const saved = localStorage.getItem('sf_name'); if (saved) $('nameInput').value = saved;
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing' && !state.ended) { /* auto-pause by pointer lock loss */ } });
+}
+/* full map: drag to pan, pinch / wheel / buttons to zoom, tap or click (without dragging) to set a waypoint */
+function initMapInput() {
+  const bm = $('bigmap'), U = G.UI, pts = new Map(); let moved = 0, t0 = 0, pd = 0;
+  const cs = () => { const r = bm.getBoundingClientRect(); return { r, f: bm.width / r.width }; };
+  const mid = () => { const a = [...pts.values()]; return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2, d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) }; };
+  bm.addEventListener('pointerdown', e => { e.preventDefault(); try { bm.setPointerCapture(e.pointerId); } catch (_) { } pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pts.size === 1) { moved = 0; t0 = performance.now(); } else if (pts.size === 2) { pd = mid().d; moved = 99; } });
+  bm.addEventListener('pointermove', e => { const p = pts.get(e.pointerId); if (!p) return; const { r, f } = cs();
+    if (pts.size === 1) { const dx = e.clientX - p.x, dy = e.clientY - p.y; moved += Math.abs(dx) + Math.abs(dy); p.x = e.clientX; p.y = e.clientY; if (moved > 6) U.mapPan(dx * f, dy * f); }
+    else if (pts.size === 2) { const m0 = mid(); p.x = e.clientX; p.y = e.clientY; const m1 = mid(); if (pd > 0 && m1.d > 0) U.mapZoomAt(m1.d / pd, (m1.x - r.left) * f, (m1.y - r.top) * f); U.mapPan((m1.x - m0.x) * f, (m1.y - m0.y) * f); pd = m1.d; } });
+  const up = e => { if (!pts.has(e.pointerId)) return; const wasOne = pts.size === 1; pts.delete(e.pointerId); if (wasOne && moved <= 6 && performance.now() - t0 < 700 && e.type === 'pointerup') U.bigClick(e); if (pts.size === 1) { moved = 99; } };
+  bm.addEventListener('pointerup', up); bm.addEventListener('pointercancel', up); bm.addEventListener('lostpointercapture', e => pts.delete(e.pointerId));
+  bm.addEventListener('wheel', e => { e.preventDefault(); const { r, f } = cs(); U.mapZoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, (e.clientX - r.left) * f, (e.clientY - r.top) * f); }, { passive: false });
+  $('mapZoomIn').onclick = () => U.mapZoomAt(1.5, 360, 360); $('mapZoomOut').onclick = () => U.mapZoomAt(1 / 1.5, 360, 360); $('mapReset').onclick = () => U.mapReset();
+}
+/* lobby: drag the island view to orbit it (horizontal = rotate, vertical = raise/lower camera) */
+function initLobbyDrag() {
+  const lob = $('lobby'); let pid = null, lx = 0, ly = 0;
+  lob.addEventListener('pointerdown', e => { if (state.phase !== 'lobby' || pid !== null || (e.pointerType === 'mouse' && e.button !== 0)) return; if (e.target.closest('input,button,label,.sw,.pk,#lvlBox,.lookset,select')) return; pid = e.pointerId; lx = e.clientX; ly = e.clientY; try { lob.setPointerCapture(pid); } catch (_) { } });
+  lob.addEventListener('pointermove', e => { if (e.pointerId !== pid) return; lobbyYaw -= (e.clientX - lx) * 0.006 * LS.sens; lobbyElev = G.clamp(lobbyElev + (e.clientY - ly) * 0.004 * LS.sens * (LS.invertY ? -1 : 1), -0.55, 1); lx = e.clientX; ly = e.clientY; });
+  const end = e => { if (e.pointerId === pid) pid = null; };
+  lob.addEventListener('pointerup', end); lob.addEventListener('pointercancel', end); lob.addEventListener('lostpointercapture', end);
 }
 function cycleSpec() { const al = G.actors.filter(a => a.alive); if (!al.length) return; const i = al.indexOf(state.spec); state.spec = al[(i + 1) % al.length]; }
 
@@ -205,7 +249,7 @@ function initTouch() {
   const t = $('touch'), lp = $('lookpad');
   t.innerHTML = '<div id="leftCtl"><div id="buildPanel" class="hidden"></div><div id="joy"><i></i></div></div><div id="actions"></div>';
   const actions = $('actions'), panel = $('buildPanel');
-  const look = (dx, dy) => { const k = 0.005 * (G.scoped ? 0.35 : mouse.r ? 0.7 : 1); yaw -= dx * k; pitch = G.clamp(pitch - dy * k, -1.45, 1.45); };
+  const look = (dx, dy) => lookBy(dx, dy, 0.005);
   const bindPtr = (el, h) => { let pid = null;
     el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (pid !== null) return; pid = e.pointerId; try { el.setPointerCapture(pid); } catch (_) { } el.classList.add('down'); G.Audio.init(); h.down && h.down(e); });
     el.addEventListener('pointermove', e => { if (e.pointerId === pid && h.move) h.move(e); });
@@ -321,7 +365,7 @@ let camPos = new T.Vector3(); const aim = { x: 0, y: 0, z: 0 };
 function updateCamera(dt) {
   const v = G.view; let fovT = 72;
   if (state.phase === 'lobby') {
-    orbit += dt * 0.04; const R = 560; camera.position.set(Math.cos(orbit) * R, 210, Math.sin(orbit) * R); camera.lookAt(0, 15, 0); fovT = 62; G.scoped = false;
+    orbit += dt * 0.04; const R = 560, oa = orbit + lobbyYaw; camera.position.set(Math.cos(oa) * R, 210 + lobbyElev * 320, Math.sin(oa) * R); camera.lookAt(0, 15, 0); fovT = 62; G.scoped = false;
   } else {
     const p = G.player;
     if (state.spec && !p.alive) { if (!state.spec.alive) state.spec = G.actors.find(a => a.alive) || null; G.view = state.spec || p; } else G.view = p;
@@ -392,6 +436,7 @@ function updateGhost() {
 /* ================= main loop ================= */
 let acc = 0, uiT = 0;
 function simStep(dt) {
+  { const ax = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0), ay = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0); if ((ax || ay) && !state.mapOpen) lookBy(-ax * 1.9 * dt, -ay * 1.5 * dt, 1); }
   G.time += dt; updateBus(dt); updateStorm(dt);
   updatePlayer(dt);
   if (!G.debug.noAI) for (const a of G.actors) { if (a.isBot) G.AI.update(a, dt); }

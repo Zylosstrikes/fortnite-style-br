@@ -190,7 +190,7 @@ body:not(.touch) .touchonly{display:none!important}
 
 /* ===================== TOUCH MODE ===================== */
 body.touch{--g:calc(8px*var(--s))}
-body.touch #lookpad{position:fixed;top:0;bottom:0;left:34%;right:0;z-index:8;touch-action:none;pointer-events:auto}
+body.touch #lookpad{position:fixed;top:0;bottom:0;left:0;right:0;z-index:8;touch-action:none;pointer-events:auto}
 body.touch #touch{position:fixed;inset:0;z-index:12;pointer-events:none;touch-action:none}
 body.touch #topLeft{left:calc(var(--sl) + 8px);top:calc(var(--st) + 8px)}
 body.touch #mini{width:calc(100px*var(--s));height:calc(100px*var(--s));border-width:2px;pointer-events:auto;touch-action:none}
@@ -281,3 +281,21 @@ body.land #emoteWheel .ring{transform:scale(.88)}
 #help .panel{max-height:92vh;overflow-y:auto}
 #mapScreen .smallbtn{align-self:center;margin-top:10px}
 @media (max-height:520px){#help .panel{padding:14px 20px;gap:6px}.panel h2{font-size:26px}.cols{gap:10px}.cols p{font-size:12px;line-height:1.55}.maptitle{font-size:22px;margin-bottom:4px}#bigmap{width:min(70vh,92vw);height:min(70vh,92vw)}#mapScreen .smallbtn{margin-top:6px;padding:6px 16px}#pause .panel{padding:14px}}
+
+
+/* ---- look settings, map controls, drag surfaces ---- */
+.lookset{display:flex;flex-direction:column;gap:6px;width:100%;max-width:340px;text-align:left}
+#pause .lookset{margin:6px 0 2px}
+.lsrow{display:grid;grid-template-columns:1fr 52px;grid-template-areas:"l v" "s s";align-items:center;column-gap:8px;row-gap:2px}
+.lsrow label{grid-area:l;font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#ffe36a}
+.lsrow b{grid-area:v;text-align:right;font-size:13px}
+.lsrow input[type=range]{grid-area:s;width:100%;height:26px;accent-color:#ffd23a;touch-action:pan-y;cursor:pointer}
+.lschk{font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.lschk input{width:20px;height:20px;accent-color:#ffd23a}
+#bigmap{touch-action:none;cursor:grab}#bigmap:active{cursor:crosshair}
+.mapctl{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:10px}
+.mapctl .smallbtn{margin-top:0;align-self:auto;min-width:44px;min-height:38px}
+#mapScreen .mapctl .smallbtn{margin-top:0}
+.lobby-right{touch-action:none;cursor:grab}
+#pause .panel{max-height:94vh;overflow-y:auto;touch-action:pan-y}
+@media (max-height:520px){#pause .bigbtn{margin-top:2px;font-size:28px;padding:4px 28px}#pause .panel{gap:6px}.lookset{gap:3px}.lsrow input[type=range]{height:20px}.mapctl{margin-top:4px}.mapctl .smallbtn{min-height:32px;padding:4px 12px}}
