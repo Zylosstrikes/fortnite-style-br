@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%237b3fe4%27/%3E%3Cpath d=%27M16 5l3 8h8l-6.5 5 2.5 8-7-5-7 5 2.5-8L5 13h8z%27 fill=%27%23ffd23f%27/%3E%3C/svg%3E">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>STORMFALL ROYALE — 3D Battle Royale</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div class="lobby-left">
+    <div class="logo"><span>STORMFALL</span><b>ROYALE</b></div>
+    <div class="tag">35-player 3D battle royale • original art • runs offline</div>
+    <label class="lbl">PLAYER NAME</label>
+    <input id="nameInput" maxlength="14" value="Player" spellcheck="false" autocomplete="off">
+    <label class="lbl">OUTFIT COLOR</label>
+    <div id="swatches"></div>
+    <label class="lbl">SETTINGS</label>
+    <div class="row"><label><input type="checkbox" id="optShadow" checked> Shadows</label><label><input type="checkbox" id="optSound" checked> Sound</label></div>
+    <button id="playBtn" class="bigbtn">PLAY</button>
+    <button id="helpBtn" class="smallbtn">CONTROLS (H)</button>
+    <div class="hint">Click PLAY, then click the game to capture the mouse. Press <b>H</b> anytime for controls.</div>
+  </div>
+  <div class="lobby-right"><div id="lobbyInfo"></div></div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="topLeft"><div class="pill" id="aliveP"><i>ALIVE</i> <b id="aliveN">35</b></div><div class="pill" id="killP"><i>ELIMS</i> <b id="killN">0</b></div></div>
+  <div id="topRight">
+    <canvas id="mini" width="200" height="200"></canvas>
+    <div id="stormBox"><span id="stormIcon"></span><span id="stormText">Storm forming</span><b id="stormTime">1:20</b></div>
+    <div id="killfeed"></div>
+  </div>
+  <div id="cross"><i></i><i></i><i></i><i></i></div>
+  <div id="hitmark"></div>
+  <div id="scope"></div>
+  <div id="dmgnums"></div>
+  <div id="prompt"></div>
+  <div id="progressWrap"><div id="progressLabel"></div><div id="progress"><i></i></div></div>
+  <div id="toast"></div>
+  <div id="busHint">Press <b>SPACE</b> to jump from the Battle Bus!</div>
+  <div id="airHint"></div>
+  <div id="stormFx"></div><div id="hurtFx"></div>
+  <div id="bottom">
+    <div id="bars"><div class="bar sh"><i id="shBar"></i><b id="shTxt">0</b></div><div class="bar hp"><i id="hpBar"></i><b id="hpTxt">100</b></div></div>
+    <div id="hotbar"></div>
+    <div id="buildbar" class="hidden"></div>
+  </div>
+  <div id="matsBox"></div>
+  <div id="ammoBox"><div id="ammoMain"></div><div id="ammoRes"></div><div id="ammoAll"></div></div>
+  <div id="emoteWheel"><span>T Dance</span><span>Y Wave</span><span>U Flex</span><span>I Spin</span></div>
+</div>
+
+<!-- FULL MAP -->
+<div id="mapScreen" class="hidden"><div class="maptitle">ISLAND MAP <small>click to place a waypoint • M to close</small></div><canvas id="bigmap" width="720" height="720"></canvas></div>
+
+<!-- HELP -->
+<div id="help" class="hidden">
+  <div class="panel">
+    <h2>CONTROLS</h2>
+    <div class="cols">
+      <div><h3>Movement</h3><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>SHIFT</kbd> sprint</p><p><kbd>SPACE</kbd> jump / leave bus / open glider</p><p>Mouse — look &nbsp; <kbd>LMB</kbd> shoot / harvest / use</p><p><kbd>RMB</kbd> aim down sights (scope)</p><p><kbd>E</kbd> interact (chest, pick up, vehicle)</p></div>
+      <div><h3>Items</h3><p><kbd>1</kbd> pickaxe &nbsp; <kbd>2</kbd>–<kbd>6</kbd> item slots</p><p><kbd>Wheel</kbd> cycle slots &nbsp; <kbd>R</kbd> reload</p><p>Hold <kbd>LMB</kbd> with a heal item to use it</p><p>Pickaxe: hit trees, rocks &amp; buildings for wood / stone / metal</p></div>
+      <div><h3>Building</h3><p><kbd>Q</kbd> wall &nbsp; <kbd>F</kbd> floor &nbsp; <kbd>Z</kbd> ramp &nbsp; <kbd>C</kbd> roof</p><p><kbd>LMB</kbd> place (hold to spam) &nbsp; <kbd>G</kbd> cycle material</p><p><kbd>X</kbd> edit wall: solid → door → window</p><p>Press a weapon slot (<kbd>1</kbd>–<kbd>6</kbd>) to leave build mode</p></div>
+      <div><h3>Other</h3><p><kbd>M</kbd> map &nbsp; <kbd>H</kbd> this help &nbsp; <kbd>N</kbd> mute</p><p>Emotes: <kbd>T</kbd> dance <kbd>Y</kbd> wave <kbd>U</kbd> flex <kbd>I</kbd> spin</p><p><kbd>ESC</kbd> release mouse / pause</p><p>Stay inside the white circle — the purple storm hurts!</p></div>
+    </div>
+    <button id="helpClose" class="smallbtn">CLOSE</button>
+  </div>
+</div>
+
+<div id="pause" class="hidden"><div class="panel"><h2>PAUSED</h2><p>Click to capture the mouse and resume.</p><button id="resumeBtn" class="bigbtn">RESUME</button><button id="helpBtn2" class="smallbtn">CONTROLS</button></div></div>
+
+<!-- END SCREEN -->
+<div id="end" class="hidden"><div id="endBox"><div id="endTitle"></div><div id="endSub"></div><div id="endStats"></div><div class="row"><button id="againBtn" class="bigbtn">PLAY AGAIN</button><button id="specBtn" class="smallbtn">SPECTATE</button></div></div><div id="confetti"></div></div>
+
+<div id="loading"><div class="logo"><span>STORMFALL</span><b>ROYALE</b></div><div id="loadMsg">Generating island…</div></div>
+<div id="touch" class="hidden"></div>
+<div id="errbox"></div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/models.js"></script>
+<script src="js/actors.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
