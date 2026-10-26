@@ -419,7 +419,7 @@ function animateBase(a, dt) {
   else { A[0].rotation.x = -sw * 0.8; A[1].rotation.x = sw * 0.8; }
 }
 /* v2: elbow / knee articulation + head look on top of the base pose */
-function animate(a, dt) {
+function animateProc(a, dt) {
   animateBase(a, dt); const r = a.rig; if (!r.knees) return; const K = r.knees, E = r.elbows, A = r.arms;
   K[0].rotation.x = K[1].rotation.x = E[0].rotation.x = E[1].rotation.x = 0;
   if (!a.alive) { E[0].rotation.x = E[1].rotation.x = 0.5; K[0].rotation.x = K[1].rotation.x = -0.4; return; }
@@ -439,6 +439,7 @@ function animate(a, dt) {
   else if (a.action) { E[0].rotation.x = 1.3; E[1].rotation.x = 1.3; }
   r.head.rotation.x = G.clamp((a.pitch || 0) * 0.5, -0.5, 0.5);
 }
+function animate(a, dt) { animateProc(a, dt); if (G.Clips && G.Clips.ready) G.Clips.apply(a, dt); }
 G.animateRig = animate;
 
 /* ================= update all ================= */

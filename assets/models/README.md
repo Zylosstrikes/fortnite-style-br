@@ -29,3 +29,5 @@ Keep the file name and node names; materials only matter through their *names*:
 
 Export with `+Y up` (glTF default), Apply Modifiers, no animations needed (the game animates the nodes procedurally). Edit `manifest.json` to
 add/remove files.
+
+* `blender/props2.py` – `scenery.glb` (rocks, bushes, cottage, stone wall, fence) and `manor.glb` (lobby manor); `blender/rig_anim.py` – `rigged/*.glb` with the six animation clips used by `js/clips.js`. Build with `build_all.py -- <dir> scenery manor rigged characters`; `blender/props_preview.py` renders the props sheet.

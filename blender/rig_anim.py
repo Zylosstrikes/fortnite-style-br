@@ -127,7 +127,7 @@ def export_rigged(root, arm, path):
 def build_rigged(outdir, cid='hero', O=None, offset=0.0):
     import json
     C.MATS.clear(); chars = json.load(open(os.path.join(H.HERE, 'specs', 'chars.json'))); S = chars[cid]
-    d = S['defaults']; C.ROLE_DEFAULT.update({'skin': d['skin'], 'top': d['top'], 'top2': d['top2'], 'pants': d['pants'], 'hair': d['hair']})
+    d = S['defaults']; C.ROLE_DEFAULT.update({'skin': 0xe0a97c, 'top': d['top'], 'top2': d['top2'], 'pants': d['pants'], 'hair': d['hair']})
     root = H.build_human(cid, S['outfit'])
     arm = make_armature('rig_' + cid); bind(root, arm); return arm
 

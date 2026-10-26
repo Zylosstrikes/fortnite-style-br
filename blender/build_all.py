@@ -2,7 +2,7 @@
 Builds every game model and exports .glb files into <output_dir>."""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import common, spec_models, props, human
+import common, spec_models, props, human, props2
 out = common.out_dir(); os.makedirs(out, exist_ok=True)
 only = [a for a in sys.argv[sys.argv.index('--') + 2:]] if '--' in sys.argv else []
 def want(n): return not only or n in only
@@ -17,4 +17,6 @@ if want('llama'): props.llama(out)
 if want('rigged'):
     import rig_anim; rig_anim.build_rigged_files(out)
 if want('trees'): props.trees(out)
+if want('scenery'): props2.build_scenery(out)
+if want('manor'): props2.build_manor(out)
 print('ALL DONE')

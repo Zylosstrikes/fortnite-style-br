@@ -457,16 +457,51 @@ W.build = function (scene) {
     for (let k = 0; k < p.count; k++) { const x = p.getX(k), y = p.getY(k), z = p.getZ(k); const d = 0.82 + 0.3 * hsh(Math.round(x * 50), Math.round(y * 50), Math.round(z * 50)); p.setXYZ(k, x * d, y * d * (y < 0 ? 0.6 : 1), z * d); }
     g.computeVertexNormals(); for (let k = 0; k < p.count; k += 3) { const ny = g.attributes.normal.getY(k); const v = 0.7 + 0.3 * Math.max(0, ny) + 0.08 * hsh(k, 1, 2); for (let m = 0; m < 3; m++) cs.push(v, v, v * 1.04); }
     g.setAttribute('color', new T.Float32BufferAttribute(cs, 3)); return g; })();
-  const nR = 260; const mRock = new T.InstancedMesh(rockGeo, new T.MeshLambertMaterial({ vertexColors: true }), nR); mRock.castShadow = true; mRock.frustumCulled = false; scene.add(mRock);
-  let rc = 0, rtry = 0; const rockCols = [0x9ea2ad, 0x8b8f9b, 0xaeb2bd, 0x7d8290];
+  const SG = G.Assets && G.Assets.sceneryGeos && G.Assets.sceneryGeos();
+  const nR = 260, rockMeshes = SG ? SG.rock.map(g => { const m = new T.InstancedMesh(g, new T.MeshLambertMaterial({ vertexColors: true }), nR); m.castShadow = true; m.frustumCulled = false; scene.add(m); m.count = 0; return m; }) : [mRock0()];
+  function mRock0() { const m = new T.InstancedMesh(rockGeo, new T.MeshLambertMaterial({ vertexColors: true }), nR); m.castShadow = true; m.frustumCulled = false; scene.add(m); return m; }
+  const rcnt = rockMeshes.map(() => 0);
+  let rc = 0, rtry = 0; const rockCols = SG ? [0xffffff, 0xf0f0f4, 0xe2e4ea, 0xfaf6f0] : [0x9ea2ad, 0x8b8f9b, 0xaeb2bd, 0x7d8290];
   while (rc < nR && rtry++ < 5000) {
     const mtn = rng() < 0.4; let x, z; if (mtn) { const a = R(0, 6.28), r = R(30, 190); x = G.MT.x + Math.cos(a) * r; z = G.MT.z + Math.sin(a) * r; } else { x = R(-430, 430); z = R(-430, 430); }
     const h = heightAt(x, z); if (h < 1.5) continue; if (rects.some(q => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3)) continue; if (roadDist(x, z) < 5) continue; if (G.POIS.some(p => Math.hypot(x - p.x, z - p.z) < p.r * 0.8 && !p.snow)) continue;
-    const s = R(1.1, 2.8) * (mtn ? 1.3 : 1); q.setFromEuler(new T.Euler(R(0, 3), R(0, 6), R(0, 3))); ps.set(x, h + s * 0.35, z); sc.set(s * R(1, 1.3), s * 0.85, s * R(1, 1.3)); mat4.compose(ps, q, sc); mRock.setMatrixAt(rc, mat4);
-    col.setHex(rockCols[Math.floor(rng() * 4)]); mRock.setColorAt(rc, col);
-    const rr = s * 0.85; const bx = addBox({ x0: x - rr, x1: x + rr, z0: z - rr, z1: z + rr, y0: h - 1, y1: h + s * 1.1, kind: 'rock', mat: 'stone', hp: 8, col: 0x9ea2ad }); bx.rock = { m: mRock, i: rc }; W.rocks.push(bx); rc++;
+    const s = R(1.1, 2.8) * (mtn ? 1.3 : 1); const vi = SG ? Math.floor(rng() * rockMeshes.length) : 0, mR = rockMeshes[vi], ri = rcnt[vi]++;
+    if (SG) q.setFromAxisAngle(new T.Vector3(0, 1, 0), R(0, 6.28)); else q.setFromEuler(new T.Euler(R(0, 3), R(0, 6), R(0, 3)));
+    ps.set(x, h + s * (SG ? 0.28 : 0.35), z); sc.set(s * R(1, 1.3), s * (SG ? R(0.8, 1.15) : 0.85), s * R(1, 1.3)); mat4.compose(ps, q, sc); mR.setMatrixAt(ri, mat4);
+    col.setHex(rockCols[Math.floor(rng() * 4)]); mR.setColorAt(ri, col);
+    const rr = s * 0.85; const bx = addBox({ x0: x - rr, x1: x + rr, z0: z - rr, z1: z + rr, y0: h - 1, y1: h + s * 1.1, kind: 'rock', mat: 'stone', hp: 8, col: 0x9ea2ad }); bx.rock = { m: mR, i: ri }; W.rocks.push(bx); rc++;
   }
-  mRock.count = rc; mRock.instanceMatrix.needsUpdate = true; if (mRock.instanceColor) mRock.instanceColor.needsUpdate = true;
+  rockMeshes.forEach((m, k) => { m.count = rcnt[k]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
+  // decor from Blender: cottages + stone walls + wooden fences (instanced), with simple axis-aligned collision
+  if (SG && SG.cottage) {
+    const mk = (geo, mat, n) => { const m = new T.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
+    const MC = mk(SG.cottage.lit, G.vcMat, 14), MG = SG.cottage.glow ? mk(SG.cottage.glow, G.glowMat, 14) : null, MW = mk(SG.wall, G.vcMat, 90), MF = mk(SG.fence, G.vcMat, 70);
+    const nC = [0], nW = [0], nF = [0], taken = []; const Y = new T.Vector3(0, 1, 0), one = new T.Vector3(1, 1, 1);
+    const put = (m, cnt, x, y, z, yaw) => { q.setFromAxisAngle(Y, yaw); ps.set(x, y, z); mat4.compose(ps, q, one); m.setMatrixAt(cnt[0]++, mat4); };
+    const free = (x, z, rad) => { const hh = heightAt(x, z); if (hh < 2 || hh > 30) return false; if (Math.abs(heightAt(x + rad, z) - hh) > 0.9 || Math.abs(heightAt(x - rad, z) - hh) > 0.9 || Math.abs(heightAt(x, z + rad) - hh) > 0.9 || Math.abs(heightAt(x, z - rad) - hh) > 0.9) return false;
+      if (rects.some(r => x > r.x0 - rad - 4 && x < r.x1 + rad + 4 && z > r.z0 - rad - 4 && z < r.z1 + rad + 4)) return false; if (roadDist(x, z) < rad + 3) return false; if (G.POIS.some(p => Math.hypot(x - p.x, z - p.z) < p.r * 0.85 + rad && !p.snow)) return false; return !taken.some(t => Math.hypot(x - t[0], z - t[1]) < t[2] + rad + 2); };
+    const solid = (x0, z0, x1, z1, y0, y1, k) => addBox({ x0, x1, z0, z1, y0, y1, kind: k || 'prop', mat: 'stone', col: 0x8e8a84 });
+    for (let n = 0, tries = 0; n < 12 && tries < 900; tries++) {
+      const x = R(-400, 400), z = R(-400, 400); if (!free(x, z, 6)) continue; const k = Math.floor(rng() * 4), yaw = k * Math.PI / 2, hh = heightAt(x, z), swap = k % 2 === 1;
+      const hx = (swap ? 2.7 : 3.2), hz = (swap ? 3.2 : 2.7);
+      put(MC, nC, x, hh - 0.05, z, yaw); if (MG) MG.setMatrixAt(nC[0] - 1, mat4);
+      solid(x - hx, z - hz, x + hx, z + hz, hh - 1, hh + 5.2, 'prop'); taken.push([x, z, 6]); n++;
+      // little garden: 2 stone wall + 1 fence pieces in front of the door (door faces -z before yaw)
+      const fx = Math.sin(yaw) * -1, fz = Math.cos(yaw) * -1; // facing vector of -z rotated by yaw about Y: (-sin, -cos)
+      for (let w = 0; w < 2 && nW[0] < 88; w++) { const sd = w ? 1 : -1, px = x + (-fz) * sd * 3.6 + fx * 5.2 * 0 + (-fx) * 0, pz = z; /* placed on the sides */
+        const cx = x + (swap ? 0 : sd * 6.2), cz = z + (swap ? sd * 6.2 : 0), wy = swap ? Math.PI / 2 : 0, hh2 = heightAt(cx, cz); if (Math.abs(hh2 - hh) > 1.0) continue;
+        put(MW, nW, cx, hh2 - 0.03, cz, wy); const ex = swap ? 0.4 : 2.0, ez = swap ? 2.0 : 0.4; solid(cx - ex, cz - ez, cx + ex, cz + ez, hh2 - 1, hh2 + 1.0, 'prop'); }
+    }
+    for (let n = 0, tries = 0; n < 24 && tries < 900; tries++) { // stand-alone field walls / fences
+      const x = R(-400, 400), z = R(-400, 400); if (!free(x, z, 3)) continue; const horiz = rng() < 0.5, fenceK = rng() < 0.5, hh = heightAt(x, z), ex = horiz ? 2.0 : 0.35, ez = horiz ? 0.35 : 2.0;
+      for (let s = 0; s < 3; s++) { const cx = x + (horiz ? s * 4 : 0), cz = z + (horiz ? 0 : s * 4), h2 = heightAt(cx, cz); if (Math.abs(h2 - hh) > 0.8) break;
+        if (fenceK) { if (nF[0] >= 68) break; put(MF, nF, cx, h2 - 0.03, cz, horiz ? 0 : Math.PI / 2); } else { if (nW[0] >= 88) break; put(MW, nW, cx, h2 - 0.03, cz, horiz ? 0 : Math.PI / 2); }
+        solid(cx - ex, cz - ez, cx + ex, cz + ez, h2 - 1, h2 + (fenceK ? 1.1 : 1.0), 'prop'); }
+      taken.push([x, z, 5]); n++;
+    }
+    for (const [m, c] of [[MC, nC], [MG, nC], [MW, nW], [MF, nF]]) if (m) { m.count = c[0]; m.instanceMatrix.needsUpdate = true; }
+    W.decor = { cottages: nC[0], walls: nW[0], fences: nF[0], taken };
+  }
   if (G.Extras) G.Extras.populate(scene, rects, R);
   // flowers
   const fg = new T.OctahedronGeometry(0.22, 0); const nF = 1600; const mF = new T.InstancedMesh(fg, new T.MeshLambertMaterial({ color: 0xffffff }), nF); let fc = 0; const fcols = [0xff6bb5, 0xffe14a, 0xffffff, 0xff8a3a, 0xa97bff];

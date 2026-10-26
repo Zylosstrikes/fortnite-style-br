@@ -86,7 +86,7 @@ function buildPick(kind) {
 
 /* ================= outfits ================= */
 G.OUTFITS = [
-  { id: 'default', name: 'Default', top: 0xdde3ec, top2: 0xf4f4f4, pants: 0x35517e, boots: 0xf2f2f2, glove: 0, pack: 0, packT: 'none', head: null, hair: 'short', hairC: 0x6b4a2e },
+  { id: 'default', name: 'Default', top: 0x9fb4cf, top2: 0xf4f4f4, pants: 0x35517e, boots: 0xf2f2f2, glove: 0, pack: 0, packT: 'none', head: null, hair: 'short', hairC: 0x6b4a2e },
   { id: 'hero', name: 'Street Hoodie', top: 0x1b1d26, top2: 0xf4f4f4, pants: 0x262a36, boots: 0xf4f4f4, glove: 0, pack: 0, packT: 'none', head: null, hair: 'short', hairC: 0xf3e6a0 },
   { id: 'ranger', name: 'Trail Ranger', top: 0x3f9a4a, top2: 0xf0e2a6, pants: 0x8a6a3a, boots: 0x5a3a22, glove: 0x5a3a22, pack: 0x7a6a30, packT: 'round', head: 'cap', headC: 0x3f9a4a, hair: 'short', hairC: 0x6a4026 },
   { id: 'neon', name: 'Neon Drifter', top: 0xff4fa8, top2: 0x35e0ff, pants: 0x232633, boots: 0xffffff, glove: 0x232633, pack: 0x35e0ff, packT: 'box', head: null, hair: 'spiky', hairC: 0x35e0ff, glasses: 'visor' },
@@ -101,7 +101,7 @@ G.OUTFITS = [
   { id: 'lab', name: 'Lab Rat', top: 0xf4f4f4, top2: 0xff7a1a, pants: 0x40414a, boots: 0xff7a1a, glove: 0xffffff, pack: 0xff7a1a, packT: 'box', head: 'goggles', headC: 0xff7a1a, hair: 'spiky', hairC: 0xff7a1a },
   { id: 'punk', name: 'Pixel Punk', top: 0x8a6bff, top2: 0xffe36a, pants: 0x2b2f3a, boots: 0xff4f4f, glove: 0xffe36a, pack: 0xff4f4f, packT: 'round', head: null, hair: 'mohawk', hairC: 0xff4fa8, glasses: 'round' },
 ];
-G.SKIN_TONES = [0xffe0c4, 0xf2c9a0, 0xd9a577, 0xa87650, 0x7b5236, 0x5a3a26];
+G.SKIN_TONES = [0xf3c8a4, 0xe0a97c, 0xc68a5c, 0x9c6a43, 0x73492b, 0x50301d];
 const _hsl = {};
 function hueShift(hex, dh, ds) { const c = new T.Color(hex); c.getHSL(_hsl); c.setHSL((_hsl.h + dh + 1) % 1, Math.max(0, Math.min(1, _hsl.s * (ds || 1))), _hsl.l); return c.getHex(); }
 /* random outfit for a bot: random preset, random hue/tone shift, random hair colour */
@@ -193,7 +193,7 @@ function segGeos(skin) {
 /* head parts were authored around the head pivot: bake the pivot offset only for the low LOD merge (done above); torso etc. are absolute. */
 const HOLD = { pistol: { z: -0.12, s: 1.25, mz: -0.36 }, dual: { z: -0.12, s: 1.3, mz: -0.36 }, shotgun: { z: -0.2, s: 1.05, mz: -0.98 }, ar: { z: -0.2, s: 1.0, mz: -1.2 }, smg: { z: -0.12, s: 1.1, mz: -0.72 }, sniper: { z: -0.05, s: 0.82, mz: -1.56 }, rocket: { z: 0.12, s: 0.85, mz: -1.28, f: 2 } };
 G.makeCharacter = function (skin) {
-  const E = segGeos(skin), GG = E.geos, O = E.O; const mat = G.vcMat, om = G.outlineMat; const PV = GG.piv || { shx: 0.46, hipx: 0.17 };
+  const E = segGeos(skin), GG = E.geos, O = E.O; const mat = G.vcMat; const PV = GG.piv || { shx: 0.46, hipx: 0.17 }; const om = GG.piv ? (G.outlineThin || (G.outlineThin = (() => { const m = G.outlineMat.clone(); m.uniforms.w.value = 0.012; return m; })())) : G.outlineMat;
   const root = new T.Group(), lean = new T.Group(), m = new T.Group(); lean.position.y = 1; m.position.y = -1; root.add(lean); lean.add(m);
   const hi = new T.Group(); m.add(hi); const outlines = [];
   const seg = (geo, parent, px, py, pz) => { const g = new T.Group(); g.position.set(px, py, pz); parent.add(g); const me = new T.Mesh(geo, mat); me.castShadow = true; g.add(me); const ol = new T.Mesh(geo, om); ol.renderOrder = -1; g.add(ol); outlines.push(ol); return g; };

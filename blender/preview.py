@@ -32,6 +32,7 @@ cr.color_ramp.elements[0].color = (0.0, 0.10, 0.62, 1); cr.color_ramp.elements[1
 # camera (characters face Blender +Y)
 cam = bpy.data.cameras.new('cam'); cam.lens = 70; co = bpy.data.objects.new('cam', cam); sc.collection.objects.link(co); sc.camera = co
 co.location = (0, 6.4, 1.0); co.rotation_euler = (math.radians(90), 0, math.radians(180))
+if 'face' in sys.argv: cam.lens = 180; co.location = (0.62 if 'hero' in sys.argv else -0.62, 6.0, 1.80)
 def light(kind, loc, energy, rot=None, color=(1, 1, 1), size=1.0):
     l = bpy.data.lights.new(kind, kind); l.energy = energy; l.color = color
     if kind == 'AREA': l.size = size
@@ -49,6 +50,6 @@ for x in (-0.62, 0.62):
 bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, -0.045)); fl = bpy.context.active_object
 fm = bpy.data.materials.new('floor'); fm.use_nodes = True; fm.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.02, 0.2, 0.7, 1); fm.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value = 0.35; fl.data.materials.append(fm)
 if FAST: sc.render.resolution_x, sc.render.resolution_y = 600, 733
-sc.render.filepath = os.path.join(out, 'preview_fast.png' if FAST else 'fortnite-character-preview.png'); sc.render.image_settings.file_format = 'PNG'
+sc.render.filepath = os.path.join(out, ('face_fast.png' if 'face' in sys.argv else 'preview_fast.png') if FAST else ('face.png' if 'face' in sys.argv else 'fortnite-character-preview.png')); sc.render.image_settings.file_format = 'PNG'
 bpy.ops.render.render(write_still=True)
 print('RENDERED', sc.render.filepath)

@@ -8,7 +8,7 @@
 (function () {
 const G = window.G, T = THREE;
 const A = G.Assets = { base: 'assets/models/', files: {}, scenes: {}, status: {}, used: {}, enabled: !/[?&]noassets/.test(location.search) && typeof T.GLTFLoader === 'function' };
-const DEFAULT_FILES = ['weapons', 'glider', 'bus', 'chest_wood', 'chest_metal', 'heals', 'llama', 'trees', 'char_default', 'char_hero', 'char_ranger', 'char_neon', 'char_frost', 'char_gold', 'char_shadow', 'char_beach', 'char_knight', 'char_circuit', 'char_dino', 'char_cow', 'char_lab', 'char_punk'];
+const DEFAULT_FILES = ['weapons', 'glider', 'bus', 'chest_wood', 'chest_metal', 'heals', 'llama', 'trees', 'scenery', 'manor', 'char_default', 'char_hero', 'char_ranger', 'char_neon', 'char_frost', 'char_gold', 'char_shadow', 'char_beach', 'char_knight', 'char_circuit', 'char_dino', 'char_cow', 'char_lab', 'char_punk'];
 const TIMEOUT = 9000;
 
 /* ---------------- loading ---------------- */
@@ -171,8 +171,23 @@ A.treeGeos = function () {
   try { const mk = (n) => bake(directMeshes(find(root, n)), {}).lit; const r = { trunk: mk('tree_trunk'), pine: mk('tree_pine'), oak: mk('tree_oak') }; used('trees'); return r; } catch (e) { console.warn('trees glb', e.message); return null; }
 };
 
+/* ---------------- scenery: rocks / bushes (instanced + individual) and cottage / wall / fence decor ---------------- */
+let SCN = null;
+function scenery() {
+  if (SCN !== null) return SCN; const root = A.scenes.scenery; if (!root) return (SCN = false);
+  try { const mk = n => { const nd = find(root, n); return nd ? bake(allMeshes(nd), {}) : null; };
+    SCN = { rock: ['rock_a', 'rock_b', 'rock_c'].map(n => mk(n).lit), bush: ['bush_a', 'bush_b', 'bush_c'].map(n => mk(n).lit), cottage: mk('cottage'), wall: mk('wall_stone').lit, fence: mk('fence_wood').lit }; used('scenery'); }
+  catch (e) { console.warn('scenery glb', e.message); SCN = false; } return SCN;
+}
+A.sceneryGeos = scenery;
+A.manor = function () { const root = A.scenes.manor; if (!root) return null; try { const g = groupFrom(bake(allMeshes(find(root, 'manor')), {}), { cast: true }); used('manor'); return g; } catch (e) { console.warn('manor glb', e.message); return null; } };
+function installBush() {
+  if (!scenery()) return; const orig = G.makeBush;
+  G.makeBush = function (variant) { const S = scenery(); if (!S) return orig(variant); const mat = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, transparent: false, opacity: 1 }); const m = new T.Mesh(S.bush[(variant || 0) % 3], mat); m.castShadow = true; m.receiveShadow = false; return m; };
+}
+
 function installAll() {
-  for (const f of [installWeapons, installGlider, installBus, installChest, installHeals, installLlama]) { try { f(); } catch (e) { console.warn('assets install', e); } }
+  for (const f of [installWeapons, installGlider, installBus, installChest, installHeals, installLlama, installBush]) { try { f(); } catch (e) { console.warn('assets install', e); } }
   const ok = Object.keys(A.status).filter(k => A.status[k] === 'ok').length, bad = Object.keys(A.status).filter(k => A.status[k] !== 'ok');
   console.log('[assets] loaded ' + ok + '/' + Object.keys(A.status).length + ' glb' + (bad.length ? ', fallback for: ' + bad.join(', ') : ''));
 }

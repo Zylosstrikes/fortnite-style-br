@@ -520,5 +520,5 @@ const boot = () => {
   requestAnimationFrame(frame);
   if (Q.has('autostart') || sessionStorage.getItem('sf_auto')) { sessionStorage.removeItem('sf_auto'); setTimeout(() => startMatch(), 200); }
 };
-setTimeout(() => { const lm = $('loadMsg'); if (lm && G.Assets && G.Assets.enabled) lm.textContent = 'Loading models…'; (G.Assets ? G.Assets.load() : Promise.resolve()).then(boot, boot); }, 60);
+setTimeout(() => { const lm = $('loadMsg'); if (lm && G.Assets && G.Assets.enabled) lm.textContent = 'Loading models…'; Promise.all([G.Assets ? G.Assets.load() : Promise.resolve(), G.Clips ? G.Clips.load('assets/models/rigged/rigged_default.glb') : Promise.resolve()]).then(boot, boot); }, 60);
 })();

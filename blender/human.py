@@ -59,28 +59,46 @@ def build_head(S, cfg, O):
     robot = cfg.get('robot')
     skin = 'skin' if not robot else 0xdfe6f2
     # skull + jaw (superellipse rings: slightly squared, stylised)
-    h.loft('skull', skin, [(-0.150, 0.040, 0.050, 0, -0.045), (-0.125, 0.075, 0.075, 0, -0.04), (-0.075, 0.102, 0.098, 0, -0.012), (0.0, 0.118, 0.118, 0, 0.0),
+    h.loft('skull', skin, [(-0.152, 0.042, 0.052, 0, -0.050), (-0.132, 0.080, 0.080, 0, -0.044), (-0.095, 0.106, 0.102, 0, -0.020), (-0.045, 0.116, 0.112, 0, -0.005), (0.0, 0.119, 0.118, 0, 0.0),
                            (0.085, 0.120, 0.122, 0, 0.004), (0.135, 0.100, 0.104, 0, 0.004), (0.165, 0.052, 0.058, 0, 0.004)], sub=2, N=20, n=2.3)
     h.tube('neck', skin, -0.30, -0.10, 0.058, 0.056, cz=0.012, sub=0)
     if not robot:
+        eyec = 0x2f3a4a if cfg.get('eye') is None else cfg['eye']
         for s in (-1, 1):
-            b.sph(0.034, 'skin', s * 0.122, -0.01, 0.01, 0.55, 1.05, 0.8, 8)                     # ears
-            b.sph(0.021, 0xffffff, s * 0.047, 0.018, -0.111, 1.0, 0.7, 0.5, 8)                  # eye whites
-            b.sph(0.0125, 0x2f3a4a if cfg.get('eye') is None else cfg['eye'], s * 0.047, 0.016, -0.1285, 1, 1, 0.5, 8)
-            b.sph(0.0055, 0x0b0b10, s * 0.047, 0.016, -0.1335, 1, 1, 0.4, 6)
-            b.box(0.052, 0.011, 0.014, 'hair', s * 0.047, 0.060, -0.112, 0, 0, s * -0.1)         # brows
-        b.sph(0.021, 'skin', 0, -0.025, -0.122, 0.9, 1.15, 1.0, 8); b.box(0.014, 0.05, 0.02, 'skin', 0, -0.005, -0.118)   # nose
-        b.box(0.056, 0.010, 0.012, 0xb4605a, 0, -0.077, -0.111); b.box(0.04, 0.008, 0.01, 0xa04c48, 0, -0.092, -0.108)     # lips
-        b.sph(0.026, 'skin', 0, -0.130, -0.075, 1.5, 0.6, 1.0, 8)                                                          # chin
+            b.sph(0.040, 'skin', s * 0.124, -0.012, 0.012, 0.50, 1.10, 0.85, 10)                  # ears
+            b.sph(0.022, 0x8a4a3c, s * 0.131, -0.012, 0.012, 0.35, 0.75, 0.55, 8)                 # inner ear shadow
+            b.sph(0.034, 'skin', s * 0.050, 0.020, -0.100, 1.05, 0.85, 0.55, 10)                   # eye socket / lid mass
+            b.sph(0.026, 0xffffff, s * 0.050, 0.016, -0.1105, 1.0, 0.85, 0.5, 10)                 # sclera
+            b.sph(0.0165, eyec, s * 0.0495, 0.015, -0.1235, 1, 1, 0.45, 10)                       # iris
+            b.sph(0.0085, 0x07070b, s * 0.0495, 0.015, -0.1285, 1, 1, 0.4, 6)                     # pupil
+            b.sph(0.0045, 0xffffff, s * 0.0435, 0.022, -0.130, 1, 1, 0.4, 5, glow=True)           # eye sparkle
+            b.sph(0.030, 'skin', s * 0.050, 0.037, -0.109, 1.15, 0.45, 0.55, 8)                    # upper lid
+            b.box(0.064, 0.0145, 0.016, 'hair', s * 0.050, 0.066, -0.112, 0.0, 0, s * -0.16)      # brows
+        b.box(0.020, 0.062, 0.022, 'skin', 0, 0.004, -0.114, -0.12, 0, 0)                          # nose bridge
+        b.sph(0.0225, 'skin', 0, -0.030, -0.124, 1.05, 0.95, 1.0, 10)                              # nose tip
+        for s in (-1, 1):
+            b.sph(0.011, 'skin', s * 0.019, -0.034, -0.116, 1, 0.8, 0.9, 6)                         # nostril wings
+            b.sph(0.0045, 0x3a1a14, s * 0.010, -0.040, -0.139, 1.0, 0.7, 0.6, 5)
+        b.box(0.046, 0.0075, 0.012, 0x7a3634, 0, -0.080, -0.1245)                                  # mouth line
+        b.box(0.032, 0.008, 0.012, 0xb86a60, 0, -0.073, -0.1252); b.box(0.040, 0.010, 0.012, 0xc87a6e, 0, -0.091, -0.1235)  # lips
+        for s in (-1, 1): b.box(0.016, 0.0085, 0.012, 0x8a3a38, s * 0.033, -0.078, -0.1215, 0, 0, s * -0.55)       # smile corners
+        b.sph(0.030, 'skin', 0, -0.134, -0.074, 1.5, 0.65, 1.0, 10)                                 # chin
     else:
         b.box(0.20, 0.07, 0.03, 0x1d2530, 0, 0.02, -0.118); b.box(0.045, 0.045, 0.012, 0x3fd0ff, -0.045, 0.02, -0.137, glow=True); b.box(0.045, 0.045, 0.012, 0x3fd0ff, 0.045, 0.02, -0.137, glow=True)
         b.box(0.07, 0.012, 0.012, 0x3fd0ff, 0, -0.06, -0.12, glow=True); b.cyl(0.006, 0.08, 0x8a929e, 0, 0.21, 0.0); b.sph(0.018, 0xff4f4f, 0, 0.255, 0, glow=True)
     hs, hc = cfg.get('hair', 'short'), 'hair'
     hk = cfg.get('head'); HC = cfg.get('headC', 0x888888)
     if hs == 'short' and hk not in ('helmet', 'hood', 'knight', 'dino', 'cowboy'):
-        h.loft('hair', hc, [(0.0, 0.123, 0.124, 0, 0.004), (0.06, 0.128, 0.130, 0, 0.006), (0.115, 0.116, 0.120, 0, 0.004), (0.158, 0.080, 0.088, 0, 0.0), (0.178, 0.030, 0.035, 0, -0.004)], sub=1, N=20, n=2.3)
-        for i in range(5): b.cone(0.022, 0.05, hc, -0.06 + i * 0.03, 0.135, -0.105, -1.0, 0, 0, 5)           # fringe tufts
-        for i in range(7): a = i / 7 * math.pi * 2; b.cone(0.016, 0.035, hc, math.cos(a) * 0.07, 0.172, math.sin(a) * 0.07, math.sin(a) * 0.5, 0, -math.cos(a) * 0.5, 5)
+        h.loft('hair', hc, [(0.0, 0.124, 0.125, 0, 0.004), (0.06, 0.130, 0.132, 0, 0.006), (0.115, 0.118, 0.122, 0, 0.004), (0.158, 0.082, 0.090, 0, 0.0), (0.180, 0.030, 0.035, 0, -0.004)], sub=1, N=20, n=2.3)
+        # clumps: swept fringe, side locks, crown tufts, nape
+        for i in range(7):
+            u = i / 6; x = -0.085 + 0.17 * u; ln = 0.05 + 0.02 * math.sin(u * math.pi * 2.3) ; b.cone(0.024, ln, hc, x, 0.128 - 0.01 * abs(u - 0.5), -0.108, -1.15, 0, (u - 0.5) * 0.9, 5)
+        for s in (-1, 1):
+            b.cone(0.03, 0.09, hc, s * 0.118, 0.06, -0.03, 0, 0, s * 0.15, 5); b.cone(0.022, 0.07, hc, s * 0.12, 0.03, 0.04, 0.3, 0, s * 0.1, 5)
+            b.box(0.008, 0.045, 0.02, hc, s * 0.119, 0.005, -0.06)
+        for i in range(9):
+            a2 = i / 9 * math.pi * 2; r = 0.06 + 0.02 * (i % 2); b.cone(0.02, 0.05 + 0.02 * (i % 3), hc, math.cos(a2) * r, 0.17, math.sin(a2) * r, math.sin(a2) * 0.6, 0, -math.cos(a2) * 0.6, 5)
+        for i in range(5): b.cone(0.026, 0.07, hc, -0.07 + i * 0.035, 0.08, 0.115, 0.5, 0, 0, 5)       # back clumps
     elif hs == 'spiky':
         h.loft('hair', hc, [(0.0, 0.123, 0.124, 0, 0.004), (0.07, 0.128, 0.130, 0, 0.006), (0.13, 0.105, 0.11, 0, 0.0), (0.175, 0.04, 0.045, 0, 0.0)], sub=1, N=18)
         for i in range(8): a = i / 8 * math.pi * 2; b.cone(0.03, 0.14, hc, math.cos(a) * 0.075, 0.2, math.sin(a) * 0.075, math.sin(a) * 0.7, 0, -math.cos(a) * 0.7, 5)
@@ -135,20 +153,30 @@ def build_torso(S, cfg, O):
     if st in ('hoodie', 'jacket', 'parka'):
         k = {'hoodie': 0.02, 'jacket': 0.016, 'parka': 0.034}[st]
         t.loft('jacket', 'top', [(0.86, 0.185 + k, 0.115 + k, 0, 0), (1.05, 0.172 + k, 0.108 + k, 0, 0), (1.22, 0.215 + k, 0.12 + k, 0, 0), (1.38, 0.269 + k, 0.133 + k, 0, 0), (1.47, 0.226 + k, 0.117 + k, 0, 0.0), (1.53, 0.125, 0.095, 0, 0.01)], sub=1)
-        hem = cfg.get('hem', 'top2'); t.loft('hem', hem, [(0.84, 0.19 + k, 0.12 + k, 0, 0), (0.93, 0.19 + k, 0.12 + k, 0, 0)], sub=0, N=20)
+        hem = 'top'
+        for yy in (0.85, 0.89): t.loft('hem%d' % int(yy * 1000), hem, [(yy - 0.012, 0.188 + k + 0.012, 0.118 + k + 0.012, 0, 0), (yy + 0.012, 0.188 + k + 0.012, 0.118 + k + 0.012, 0, 0)], sub=0, N=20)
         zk = 0.115 + k + 0.002
-        if st == 'hoodie':   # open zip: plain tee panel between two zip tapes + dark inner shadow
-            b.box(0.11, 0.56, 0.012, tee if tee != 'top' else 0xf4f4f4, 0, 1.20, -zk, 0, 0, 0)
-            for s in (-1, 1): b.box(0.014, 0.58, 0.016, 'top2', s * 0.062, 1.20, -zk - 0.004)
-            b.box(0.02, 0.07, 0.02, 0xb8bec8, -0.062, 0.96, -zk - 0.008)   # zip pull
+        if st == 'hoodie':   # open zip: narrow tee strip between two dark zip tapes, drawstrings, kangaroo pocket
+            b.box(0.070, 0.46, 0.012, tee if tee != 'top' else 0xf4f4f4, 0, 1.27, -zk, 0.0, 0, 0)
+            for s_ in (-1, 1):
+                b.box(0.012, 0.60, 0.016, 0x2c2f3a, s_ * 0.043, 1.20, -zk - 0.004)
+                b.cyl(0.0055, 0.20, 'top2', s_ * 0.058, 1.38, -zk - 0.016, 'y'); b.cyl(0.009, 0.03, 'top2', s_ * 0.058, 1.275, -zk - 0.016, 'y')   # drawstrings + aglets
+            b.box(0.018, 0.045, 0.02, 0xb8bec8, -0.043, 0.96, -zk - 0.008)   # zip pull
+            b.box(0.27, 0.12, 0.014, 'top', 0, 0.99, -zk + 0.002); b.box(0.27, 0.007, 0.016, 0x14151a, 0, 1.05, -zk - 0.002)  # kangaroo pocket + top seam
+            for s_ in (-1, 1): b.box(0.006, 0.12, 0.016, 0x14151a, s_ * 0.135, 0.99, -zk - 0.002, 0, 0, s_ * 0.18)
             t.loft('collar', 'top', [(1.46, 0.135, 0.11, 0, 0.0), (1.56, 0.12, 0.105, 0, 0.012)], sub=1)
             t.loft('hoodback', 'top', [(1.40, 0.19, 0.06, 0, 0.12), (1.52, 0.17, 0.09, 0, 0.1), (1.62, 0.12, 0.11, 0, 0.09)], sub=1)
+            t.loft('hoodrim', 'top', [(1.50, 0.15, 0.115, 0, 0.0), (1.565, 0.145, 0.12, 0, 0.0)], sub=1)
         else:
             b.box(0.02, 0.62, 0.016, 'top2', 0, 1.17, -zk - 0.004)
             t.loft('collar', 'top2', [(1.50, 0.12, 0.10, 0, 0.0), (1.585, 0.098, 0.088, 0, 0.012)], sub=1)
         # side stripes
         for s in (-1, 1):
-            if cfg.get('stripes'): b.box(0.012, 0.5, 0.03, 'top2', s * (0.19 + k), 1.12, 0.0, 0, 0, 0)
+            if cfg.get('stripes'):
+                prof = [(0.88, 0.190), (1.05, 0.172), (1.22, 0.215), (1.38, 0.268)]
+                for (y0, r0), (y1, r1) in zip(prof[:-1], prof[1:]):
+                    ym = (y0 + y1) / 2; rm = (r0 + r1) / 2 + k; ang = math.atan2(r1 - r0, y1 - y0)
+                    b.box(0.016, (y1 - y0) + 0.02, 0.03, 'top2', s * (rm - 0.002), ym, 0.0, 0, 0, -s * ang)
         # pockets
         if st == 'hoodie': 
             for s in (-1, 1): b.box(0.10, 0.012, 0.05, 'top', s * 0.12, 0.97, -zk + 0.005, 0.0, 0, s * 0.45)
@@ -162,14 +190,14 @@ def build_torso(S, cfg, O):
     # belt + pants hips
     pk = cfg.get('pants', 'cargo'); pcol = 'pants'
     t.loft('hips', pcol, [(0.80, 0.19, 0.125, 0, 0), (0.92, 0.195, 0.125, 0, 0), (1.04, 0.178, 0.112, 0, 0)], sub=1)
-    b.box(0.36, 0.035, 0.24, 0x1c1e25, 0, 1.03, 0.0)
+    if st not in ('hoodie', 'jacket', 'parka'): b.box(0.36, 0.035, 0.24, 0x1c1e25, 0, 1.03, 0.0)
     if pk == 'jeans': b.box(0.05, 0.03, 0.01, 0xd8b45a, 0, 1.03, -0.122)
     if cfg.get('chain'):
         pts = []
         for i in range(15):
-            u = i / 14; x = -0.075 + 0.15 * u; yy = 1.545 - 0.28 * math.sin(math.pi * u) ** 0.8 * 1.0; zz = -0.115 - 0.05 * math.sin(math.pi * u)
+            u = i / 14; x = -0.075 + 0.15 * u; yy = 1.545 - 0.28 * math.sin(math.pi * u) ** 0.8 * 1.0; zz = -0.168 - 0.006 * math.sin(math.pi * u)
             b.sph(0.0085, 0xc9ced8, x, yy, zz, seg=5)
-        b.box(0.036, 0.062, 0.008, 0xa7adb8, 0, 1.285, -0.168, 0.1, 0, 0); b.cyl(0.012, 0.008, 0xa7adb8, 0, 1.325, -0.162, 'z')
+        b.box(0.034, 0.058, 0.008, 0x8a909c, 0, 1.285, -0.172, 0.1, 0, 0)
     # backpack
     pt, pc = cfg.get('packT'), cfg.get('pack', 0x7a6a30)
     if pt == 'round': b.sph(0.17, pc, 0, 1.27, 0.2, 1, 1.15, 0.8, 12); b.box(0.22, 0.09, 0.07, 0x23262c, 0, 1.12, 0.31)
@@ -188,16 +216,16 @@ def build_arms(S, cfg, O):
         a = Out('arm_' + side, S['root'], (X, SH_Y, 0), (X, SH_Y, 0)); b = a.b
         f = Out('forearm_' + side, a.n, (0, EL_Y - SH_Y, 0), (X, EL_Y, 0)); fb = f.b
         a.tube('skin', sk, 1.33, 0.92, 0.058, 0.05, cx=X, mid=(1.2, 0.062), sub=1)
-        a.b.sph(0.07, 'top' if (long_sleeve or st != 'vest') else sk, X - s * 0.02, 1.4, 0, 1.0, 0.9, 1.0, 10)           # shoulder cap
         if long_sleeve:
             kk = 0.016 if st != 'parka' else 0.03
-            a.tube('sleeve', 'top', 1.40, 0.91, 0.078 + kk, 0.068 + kk, cx=X, mid=(1.22, 0.082 + kk), sub=1)
+            a.loft('sleeve', 'top', [(1.455, 0.045, 0.045, X - s * 0.015, 0), (1.435, 0.080, 0.078, X - s * 0.012, 0), (1.40, 0.094 + kk, 0.090 + kk, X - s * 0.004, 0), (1.22, 0.082 + kk, 0.082 + kk, X, 0), (0.91, 0.068 + kk, 0.068 + kk, X, 0)], sub=1, N=14)
             f.tube('sleeve', 'top', 1.09, 0.76, 0.068 + kk, 0.056 + kk, cx=X, sub=1)
-            f.loft('cuff', 'top2', [(0.775, 0.058 + kk, 0.058 + kk, X, 0), (0.725, 0.056 + kk, 0.056 + kk, X, 0)], sub=0, N=14)
+            for yy in (0.775, 0.75, 0.725): f.loft('cuff%d' % int(yy * 1000), 'top', [(yy - 0.011, 0.062 + kk, 0.062 + kk, X, 0), (yy + 0.011, 0.062 + kk, 0.062 + kk, X, 0)], sub=0, N=14)
+            f.b.box(0.13, 0.006, 0.012, 0x14151a, X, 0.99, -0.062 - kk, 0, 0, 0); f.b.box(0.12, 0.006, 0.012, 0x14151a, X, 0.96, -0.062 - kk, 0, 0, 0)   # elbow creases
             if cfg.get('stripes'):
-                ox = X + s * (0.078 + kk - 0.006); a.b.box(0.012, 0.40, 0.03, 'top2', ox, 1.2, 0.0); f.b.box(0.012, 0.24, 0.026, 'top2', X + s * (0.066 + kk - 0.006), 0.9, 0.0)
+                ox = X + s * (0.082 + kk - 0.01); a.b.box(0.014, 0.36, 0.028, 'top2', ox, 1.18, 0.0); f.b.box(0.014, 0.22, 0.026, 'top2', X + s * (0.066 + kk - 0.01), 0.9, 0.0)
         else:
-            a.tube('sleeve', 'top', 1.405, 1.12, 0.084, 0.078, cx=X, sub=1)
+            a.loft('sleeve', 'top', [(1.455, 0.045, 0.045, X - s * 0.015, 0), (1.435, 0.080, 0.078, X - s * 0.012, 0), (1.405, 0.092, 0.088, X, 0), (1.12, 0.078, 0.078, X, 0)], sub=1, N=14)
             if cfg.get('trim'): a.loft('cuff', 'top2', [(1.19, 0.08, 0.08, X, 0), (1.17, 0.08, 0.08, X, 0)], sub=0)
         f.tube('skin', sk, 1.08, 0.70, 0.048, 0.04, cx=X, sub=1)
         f.b.sph((0.066 + (0.016 if st != 'parka' else 0.03)) if long_sleeve else 0.046, 'top' if long_sleeve else sk, X, 1.0, 0, 1, 1, 1, 8)
@@ -293,7 +321,7 @@ def build_characters(outdir, only=None):
     for cid, S in chars.items():
         if only and cid not in only: continue
         C.reset(); C.BEVEL = 0.008
-        d = S['defaults']; C.ROLE_DEFAULT.update({'skin': d['skin'], 'top': d['top'], 'top2': d['top2'], 'pants': d['pants'], 'hair': d['hair']})
+        d = S['defaults']; C.ROLE_DEFAULT.update({'skin': 0xe0a97c, 'top': d['top'], 'top2': d['top2'], 'pants': d['pants'], 'hair': d['hair']})
         root = build_human(cid, S['outfit'])
         lod_low(root)
         finalize_and_export(root, os.path.join(outdir, 'char_' + cid + '.glb'))
