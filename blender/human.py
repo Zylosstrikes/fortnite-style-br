@@ -138,9 +138,9 @@ def build_torso(S, cfg, O):
         hem = cfg.get('hem', 'top2'); t.loft('hem', hem, [(0.84, 0.19 + k, 0.12 + k, 0, 0), (0.93, 0.19 + k, 0.12 + k, 0, 0)], sub=0, N=20)
         zk = 0.115 + k + 0.002
         if st == 'hoodie':   # open zip: plain tee panel between two zip tapes + dark inner shadow
-            b.box(0.14, 0.58, 0.012, tee if tee != 'top' else 0xf4f4f4, 0, 1.20, -zk, 0, 0, 0)
-            for s in (-1, 1): b.box(0.018, 0.60, 0.016, 'top2', s * 0.078, 1.20, -zk - 0.004)
-            b.box(0.02, 0.07, 0.02, 0xb8bec8, -0.078, 0.96, -zk - 0.008)   # zip pull
+            b.box(0.11, 0.56, 0.012, tee if tee != 'top' else 0xf4f4f4, 0, 1.20, -zk, 0, 0, 0)
+            for s in (-1, 1): b.box(0.014, 0.58, 0.016, 'top2', s * 0.062, 1.20, -zk - 0.004)
+            b.box(0.02, 0.07, 0.02, 0xb8bec8, -0.062, 0.96, -zk - 0.008)   # zip pull
             t.loft('collar', 'top', [(1.46, 0.135, 0.11, 0, 0.0), (1.56, 0.12, 0.105, 0, 0.012)], sub=1)
             t.loft('hoodback', 'top', [(1.40, 0.19, 0.06, 0, 0.12), (1.52, 0.17, 0.09, 0, 0.1), (1.62, 0.12, 0.11, 0, 0.09)], sub=1)
         else:
@@ -188,7 +188,7 @@ def build_arms(S, cfg, O):
         a = Out('arm_' + side, S['root'], (X, SH_Y, 0), (X, SH_Y, 0)); b = a.b
         f = Out('forearm_' + side, a.n, (0, EL_Y - SH_Y, 0), (X, EL_Y, 0)); fb = f.b
         a.tube('skin', sk, 1.33, 0.92, 0.058, 0.05, cx=X, mid=(1.2, 0.062), sub=1)
-        a.b.sph(0.078, 'top' if (long_sleeve or st != 'vest') else sk, X - s * 0.015, 1.405, 0, 1.0, 1.0, 1.0, 10)           # shoulder cap
+        a.b.sph(0.07, 'top' if (long_sleeve or st != 'vest') else sk, X - s * 0.02, 1.4, 0, 1.0, 0.9, 1.0, 10)           # shoulder cap
         if long_sleeve:
             kk = 0.016 if st != 'parka' else 0.03
             a.tube('sleeve', 'top', 1.40, 0.91, 0.078 + kk, 0.068 + kk, cx=X, mid=(1.22, 0.082 + kk), sub=1)
@@ -235,7 +235,7 @@ def build_legs(S, cfg, O):
                 if cfg.get('stripes'): lb.box(0.012, 0.62, 0.03, 'top2', X + s * (0.112 + k), 0.7, 0.0); sb.box(0.012, 0.34, 0.03, 'top2', X + s * (0.08 + k), 0.26, 0.0)
             if pk == 'jeans': lb.box(0.007, 0.5, 0.012, 0xe0c27a, X + s * 0.1, 0.65, 0.0)
         # chunky sneaker
-        sb.box(0.125, 0.05, 0.27, sole, X, 0.028, -0.055); sb.box(0.128, 0.012, 0.31, 0x8a909b, X, 0.056, -0.045)
+        sb.box(0.125, 0.05, 0.27, sole, X, 0.028, -0.055); sb.box(0.128, 0.012, 0.31, sole, X, 0.056, -0.045)
         sb.sph(0.075, boots, X, 0.082, -0.01, 0.95, 0.75, 1.55, 12); sb.sph(0.062, boots, X, 0.075, -0.115, 1.0, 0.7, 1.1, 10)
         sb.box(0.07, 0.03, 0.09, boots, X, 0.125, -0.07, 0.4, 0, 0); sb.box(0.03, 0.012, 0.1, sole, X, 0.122, -0.06, 0.4, 0, 0)
         sb.box(0.13, 0.014, 0.1, 0x14161b if sole != 0x14161b else 0x444, X, 0.03, 0.06)

@@ -9,10 +9,10 @@ L.slots = [{ x: -2.0, z: 0.5 }, { x: 2.0, z: 0.5 }, { x: -3.5, z: 1.9 }, { x: 3.
 
 L.build = function (scene) {
   scene.background = new T.Color(0x0b2d45); scene.fog = new T.Fog(0x16597a, 12, 95);
-  scene.add(new T.HemisphereLight(0xa6d2ff, 0x274a66, 0.95));
-  const key = new T.DirectionalLight(0xd8ecff, 0.85); key.position.set(3, 6, -5); scene.add(key);
-  const rim = new T.DirectionalLight(0x58c8ff, 1.1); rim.position.set(-4, 3.5, 5); scene.add(rim);
-  const warm = new T.DirectionalLight(0xffc890, 0.35); warm.position.set(5, 2, -2); scene.add(warm);
+  scene.add(new T.HemisphereLight(0xa6d2ff, 0x274a66, 0.6));
+  const key = new T.DirectionalLight(0xd8ecff, 0.5); key.position.set(3, 6, -5); scene.add(key);
+  const rim = new T.DirectionalLight(0x58c8ff, 0.6); rim.position.set(-4, 3.5, 5); scene.add(rim);
+  const warm = new T.DirectionalLight(0xffc890, 0.2); warm.position.set(5, 2, -2); scene.add(warm);
   // ---- ground: snow with soft drifts, clearing in the middle
   const gg = new T.PlaneGeometry(120, 90, 60, 45); gg.rotateX(-Math.PI / 2); const p = gg.attributes.position, col = [];
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const d = Math.hypot(x, z - 2); const h = (Math.sin(x * 0.35) * Math.cos(z * 0.3) + Math.sin(x * 0.13 + z * 0.17)) * 0.35 * Math.min(1, Math.max(0, (d - 5) / 8)); p.setY(i, h - 0.02);
@@ -50,9 +50,9 @@ L.build = function (scene) {
   const disc = new T.Mesh(new T.CylinderGeometry(0.95, 1.02, 0.1, 40), new T.MeshLambertMaterial({ color: 0x1b3550 })); disc.position.y = -0.05; plat.add(disc);
   const glowTop = new T.Mesh(new T.CylinderGeometry(0.86, 0.86, 0.02, 40), new T.MeshBasicMaterial({ color: 0x9fe8ff, fog: false })); glowTop.position.y = 0.005; plat.add(glowTop);
   const ring = new T.Mesh(new T.TorusGeometry(0.97, 0.035, 8, 56), new T.MeshBasicMaterial({ color: 0x6fe0ff, fog: false })); ring.rotation.x = Math.PI / 2; ring.position.y = 0.01; plat.add(ring);
-  const shaft = new T.Mesh(new T.CylinderGeometry(0.78, 0.92, 6, 28, 1, true), new T.MeshBasicMaterial({ color: 0x3fc4ff, transparent: true, opacity: 0.13, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false })); shaft.position.y = 3; plat.add(shaft);
+  const shaft = new T.Mesh(new T.CylinderGeometry(0.78, 0.92, 6, 28, 1, true), new T.MeshBasicMaterial({ color: 0x3fc4ff, transparent: true, opacity: 0.2, blending: T.AdditiveBlending, depthWrite: false, side: T.BackSide, fog: false })); shaft.position.y = 3; plat.add(shaft);
   const halo = new T.Mesh(new T.CircleGeometry(2.6, 40), new T.MeshBasicMaterial({ color: 0x3fb8ff, transparent: true, opacity: 0.22, blending: T.AdditiveBlending, depthWrite: false, fog: false })); halo.rotation.x = -Math.PI / 2; halo.position.y = 0.02; plat.add(halo);
-  const pl = new T.PointLight(0x58c8ff, 1.6, 7); pl.position.set(0, 0.6, -0.6); plat.add(pl); scene.add(plat); L.shaft = shaft; L.ring = ring; L.halo = halo;
+  const pl = new T.PointLight(0x58c8ff, 0.5, 7); pl.position.set(0, 0.6, -0.6); plat.add(pl); scene.add(plat); L.shaft = shaft; L.ring = ring; L.halo = halo;
   // ---- party slots: dim discs on the snow
   L.slotMeshes = L.slots.map(s => { const g = new T.Group(); const d = new T.Mesh(new T.CylinderGeometry(0.5, 0.54, 0.06, 32), new T.MeshLambertMaterial({ color: 0x24465f })); d.position.y = -0.03; g.add(d);
     const r = new T.Mesh(new T.TorusGeometry(0.52, 0.02, 6, 40), new T.MeshBasicMaterial({ color: 0x4aa8d8, transparent: true, opacity: 0.8, fog: false })); r.rotation.x = Math.PI / 2; r.position.y = 0.005; g.add(r);
@@ -72,7 +72,7 @@ L.build = function (scene) {
 L.update = function (dt) {
   L.t += dt; const p = L.snow.geometry.attributes.position, a = p.array, N = a.length / 3;
   for (let i = 0; i < N; i++) { a[i * 3 + 1] -= L.snowSpd[i] * dt; a[i * 3] += Math.sin(L.t * 0.6 + i) * dt * 0.25 - dt * 0.12; if (a[i * 3 + 1] < 0) { a[i * 3 + 1] = 10; a[i * 3] = (Math.random() - 0.5) * 32; } if (a[i * 3] < -16) a[i * 3] = 16; }
-  p.needsUpdate = true; L.shaft.material.opacity = 0.12 + Math.sin(L.t * 1.6) * 0.03; L.halo.scale.setScalar(1 + Math.sin(L.t * 1.6) * 0.03);
+  p.needsUpdate = true; L.shaft.material.opacity = 0.18 + Math.sin(L.t * 1.6) * 0.03; L.halo.scale.setScalar(1 + Math.sin(L.t * 1.6) * 0.03);
   if (L.house) L.house.position.x = 5 + Math.sin(L.t * 0.05) * 0.2;
 };
 })();
