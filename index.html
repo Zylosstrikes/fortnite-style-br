@@ -15,29 +15,50 @@
 
 <!-- LOBBY -->
 <div id="lobby">
-  <div class="lobby-left">
-    <div class="logo"><span>STORMFALL</span><b>ROYALE</b></div>
-    <div class="tag">35-player 3D battle royale • original procedural art • runs offline</div>
-    <label class="lbl">PLAYER NAME</label>
-    <input id="nameInput" maxlength="14" value="Player" spellcheck="false" autocomplete="off">
-    <label class="lbl">OUTFIT</label>
-    <div id="outfitRow"></div>
-    <label class="lbl">SKIN TONE</label>
-    <div id="toneRow"></div>
-    <label class="lbl">TINT (OPTIONAL)</label>
-    <div id="swatches"></div>
-    <label class="lbl">PICKAXE</label>
-    <div id="pickRow"></div>
-    <div id="lvlBox"><div class="lvlN"><i>LV</i><b id="lvlNum">1</b></div><div class="lvlR"><div class="lvlBar"><i id="lvlFill"></i></div><span id="lvlTxt">0 / 120 XP</span></div></div>
-    <label class="lbl">SETTINGS</label>
+  <div id="previewBox"><span id="previewHint">DRAG TO ROTATE</span></div>
+  <div id="lobbyNav">
+    <div class="navicon" title="Menu">&#9638;</div>
+    <div id="navTabs">
+      <button class="ntab sel" data-tab="play">PLAY</button>
+      <button class="ntab" data-tab="locker">LOCKER</button>
+      <button class="ntab" data-tab="quests">QUESTS</button>
+      <button class="ntab" data-tab="career">CAREER</button>
+    </div>
+    <div class="navgrow"></div>
+    <button id="gearBtn" class="navicon" title="Settings">&#9881;</button>
+    <div class="avatar" id="navAvatar"><i></i></div>
+  </div>
+  <div id="promo"><div class="pbg"></div><div class="ptxt"><small>SEASON ONE</small><b>STORM SURGE</b><span>35-player battle royale</span></div></div>
+  <div id="nameTag"><span id="rdyTag">READY</span><input id="nameInput" maxlength="14" value="Player" spellcheck="false" autocomplete="off"></div>
+  <div id="slotsLayer"></div>
+  <div id="modeCard">
+    <div class="mc-title">BATTLE ROYALE</div>
+    <div class="mc-row"><b>RANKED: OFF</b><small>SOLO</small></div>
+    <button id="playBtn" class="bigbtn">PLAY</button>
+  </div>
+  <div id="lobbyLvl"><div class="lvlN"><i>LVL</i><b id="lvlNum">1</b></div><div class="lvlR"><div class="lvlBar"><i id="lvlFill"></i></div><span id="lvlTxt">0 / 120 XP</span></div></div>
+  <div id="lobbyBtns"><button id="emoteBtn"><i>E</i>EMOTE</button><button id="backBtn"><i>Q</i>BACK</button><button id="chatBtn"><i>T</i>CHAT</button></div>
+  <div id="lobbyInfo"></div>
+  <div id="lobbyChat" class="hidden"><div id="chatLog"><p><b>System</b> Squad chat is offline in this single-player build.</p></div><div class="chatrow"><input id="chatIn" maxlength="60" placeholder="Say something..."><button id="chatSend">SEND</button></div></div>
+  <!-- LOCKER -->
+  <div id="locker" class="panel2 hidden">
+    <div class="ptitle">LOCKER</div>
+    <div id="lockTabs"><button class="ltab sel" data-lt="outfit">OUTFITS</button><button class="ltab" data-lt="pick">PICKAXE</button><button class="ltab" data-lt="glider">GLIDER &amp; TINT</button><button class="ltab" data-lt="skin">SKIN TONE</button></div>
+    <div class="lpane" data-lp="outfit"><div id="outfitRow"></div></div>
+    <div class="lpane hidden" data-lp="pick"><div id="pickRow"></div></div>
+    <div class="lpane hidden" data-lp="glider"><div class="lnote">Your glider and outfit accents use this colour.</div><div id="swatches"></div></div>
+    <div class="lpane hidden" data-lp="skin"><div id="toneRow"></div></div>
+  </div>
+  <div id="questsPanel" class="panel2 hidden"><div class="ptitle">QUESTS</div><ul class="qlist"><li><b>First Drop</b><span>Land at a named location</span><i>Daily</i></li><li><b>Hunter</b><span>Eliminate 3 players in a match</span><i>Daily</i></li><li><b>Treasure Seeker</b><span>Open 5 chests</span><i>Weekly</i></li><li><b>Last Circle</b><span>Survive to the final storm circle</span><i>Weekly</i></li></ul><div class="lnote">Quest tracking arrives in a future update.</div></div>
+  <div id="careerPanel" class="panel2 hidden"><div class="ptitle">CAREER</div><div id="careerBody"></div></div>
+  <div id="lobbySettings" class="panel2 hidden">
+    <div class="ptitle">SETTINGS</div>
     <div class="row"><label><input type="checkbox" id="optShadow" checked> Shadows</label><label><input type="checkbox" id="optSound" checked> Sound</label></div>
     <label class="lbl">LOOK / CAMERA</label>
     <div id="lookSetLobby"></div>
-    <button id="playBtn" class="bigbtn">PLAY</button>
     <button id="helpBtn" class="smallbtn">CONTROLS (H)</button>
-    <div class="hint">Click PLAY, then click the game to capture the mouse (if the browser blocks that, just click &amp; drag to look). Drag on the island view to rotate it. Press <b>H</b> anytime for controls.</div>
+    <div class="hint">Click PLAY, then click the game to capture the mouse (if the browser blocks that, just click &amp; drag to look). Press <b>H</b> anytime for controls.</div>
   </div>
-  <div class="lobby-right"><div id="previewBox"><span id="previewHint">DRAG TO TURN</span></div><div id="lobbyInfo"></div></div>
 </div>
 
 <!-- HUD -->
@@ -118,6 +139,8 @@
 <script src="js/bots.js"></script>
 <script src="js/features.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/lobbyui.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

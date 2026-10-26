@@ -7,7 +7,7 @@ blender -b --python blender/build_all.py -- <output_dir> [weapons characters gli
 ```
 
 * `blender/common.py` – Builder (primitive → bevelled/smooth Blender meshes, role materials, glTF export)
-* `blender/spec_models.py` – weapons, pickaxes, 12 outfit characters, umbrella glider, battle bus + gored balloon (from `blender/specs/*.json`, recorded from the game's builders by `blender/tools/dump_specs.py`)
+* `blender/spec_models.py` – weapons, pickaxes, 14 human outfit characters (`blender/human.py`; decimated with `blender/optimize_chars.sh`), umbrella glider, battle bus + gored balloon (from `blender/specs/*.json`, recorded from the game's builders by `blender/tools/dump_specs.py`)
 * `blender/props.py` – hand-written chests, healing pickups, llama, trees
 
 `js/assets.js` loads them with `lib/GLTFLoader.js`, bakes each node into one merged vertex-coloured mesh (+ one glow mesh) so draw calls stay

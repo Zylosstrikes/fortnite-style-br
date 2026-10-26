@@ -80,27 +80,36 @@ const PV = { scene: null, cam: null, rig: null, yaw: 0.45, key: '', t: 0, drag: 
 function playerSkin() { const U = UI(); const sk = { outfit: U.outfit, tone: U.tone, pick: U.pick }; if (U.skinColor != null) { sk.shirt = U.skinColor; sk.acc = U.skinColor === 0xffd83a ? 0xff5a5a : 0xffffff; } return sk; }
 G.playerSkin = playerSkin;
 function pvInit() {
-  PV.scene = new T.Scene(); PV.cam = new T.PerspectiveCamera(30, 0.7, 0.5, 60);
-  PV.scene.add(new T.HemisphereLight(0xe8f4ff, 0x8fbf6a, 0.95)); const dl = new T.DirectionalLight(0xfff1d0, 0.9); dl.position.set(-3, 6, -4); PV.scene.add(dl); const rl = new T.DirectionalLight(0x9fd4ff, 0.5); rl.position.set(4, 3, 5); PV.scene.add(rl);
-  const pad = new T.Mesh(new T.CylinderGeometry(1.15, 1.25, 0.12, 28), new T.MeshLambertMaterial({ color: 0x3a4f7a })); pad.position.y = -0.06; PV.scene.add(pad);
-  const ring = new T.Mesh(new T.TorusGeometry(1.18, 0.035, 6, 40), new T.MeshBasicMaterial({ color: 0xffd83a })); ring.rotation.x = Math.PI / 2; PV.scene.add(ring);
+  PV.scene = new T.Scene(); PV.cam = new T.PerspectiveCamera(30, 1.6, 0.5, 160); PV.shift = 0; PV.emote = null;
+  G.Lobby.build(PV.scene);
   const el = $('previewBox'); const dn = e => { PV.drag = e.pointerId; PV.lx = e.clientX; try { el.setPointerCapture(e.pointerId); } catch (_) { } e.stopPropagation(); };
   el.addEventListener('pointerdown', dn); el.addEventListener('pointermove', e => { if (PV.drag === e.pointerId) { PV.yaw += (e.clientX - PV.lx) * 0.012; PV.lx = e.clientX; PV.spin = 6; } });
   const up = e => { if (PV.drag === e.pointerId) PV.drag = false; }; el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   G.pvRefresh = pvRefresh;
+  G.pvYaw = () => PV.yaw; G.lobbyEmote = function (name) { PV.emote = { name, t: 0 }; };
 }
 function pvRefresh() {
   const sk = playerSkin(), U = UI(), key = [sk.outfit, sk.tone, sk.shirt, sk.acc, sk.pick].join('|'); if (key === PV.key || !PV.scene) return; PV.key = key;
   if (PV.rig) PV.scene.remove(PV.rig.root); PV.rig = G.makeCharacter(sk); PV.rig.setHeld('pickaxe'); PV.rig.setLOD(0); PV.scene.add(PV.rig.root);
 }
 function pvRender(dt) {
-  const el = $('previewBox'); if (!el || !PV.scene) return; const r = el.getBoundingClientRect(); if (r.width < 40 || r.height < 60) return; pvRefresh(); if (!PV.rig) return;
-  PV.t += dt; PV.spin = Math.max(0, PV.spin - dt); if (!PV.drag && PV.spin <= 0) PV.yaw += (0.45 - PV.yaw) * Math.min(1, dt * 0.6);
-  const rg = PV.rig, t = PV.t, ph = t * 1.6; rg.root.rotation.y = PV.yaw; rg.m.position.y = -1 + Math.sin(ph) * 0.012; rg.lean.rotation.x = Math.sin(ph) * 0.012;
-  const wv = (t % 9) > 6.5; rg.arms[0].rotation.set(0.05 + Math.sin(ph) * 0.03, 0, 0.05); rg.elbows[0].rotation.x = 0.2; rg.arms[1].rotation.set(0.5, 0, -0.1); rg.elbows[1].rotation.x = 0.6; rg.legs[0].rotation.x = 0; rg.legs[1].rotation.x = 0; rg.knees[0].rotation.x = rg.knees[1].rotation.x = 0; rg.head.rotation.set(0, Math.sin(t * 0.7) * 0.2, 0);
-  if (wv) { rg.arms[0].rotation.set(0, 0, 2.7 + Math.sin(t * 11) * 0.2); rg.elbows[0].rotation.x = 0.3; }
-  const asp = r.width / r.height, c = PV.cam, dist = Math.max(5.9, 1.05 / (Math.tan(15 * Math.PI / 180) * asp)); c.aspect = asp; c.updateProjectionMatrix(); c.position.set(0, 1.5, -dist); c.lookAt(0, 1.08, 0);
-  const rd = renderer, bottom = innerHeight - r.bottom; rd.setScissorTest(true); rd.setViewport(r.left, bottom, r.width, r.height); rd.setScissor(r.left, bottom, r.width, r.height); rd.autoClear = false; rd.clearDepth(); rd.render(PV.scene, c); rd.autoClear = true; rd.setScissorTest(false); rd.setViewport(0, 0, innerWidth, innerHeight);
+  if (!PV.scene) return; pvRefresh(); if (!PV.rig) return; G.Lobby.update(dt);
+  const W = innerWidth, H = innerHeight, asp = W / H, port = asp < 0.9;
+  PV.t += dt; PV.spin = Math.max(0, PV.spin - dt); if (!PV.drag && PV.spin <= 0) PV.yaw += (0.35 - PV.yaw) * Math.min(1, dt * 0.6);
+  const rg = PV.rig, t = PV.t, ph = t * 1.6; rg.root.rotation.y = PV.yaw; rg.m.position.y = -1 + Math.sin(ph) * 0.012; rg.lean.rotation.set(Math.sin(ph) * 0.012, 0, 0); rg.lean.position.y = 1;
+  const A = rg.arms, E = rg.elbows, Lg = rg.legs, K = rg.knees; A[0].rotation.set(0.05 + Math.sin(ph) * 0.03, 0, 0.06); E[0].rotation.set(0.25, 0, 0); A[1].rotation.set(0.5, 0, -0.1); E[1].rotation.set(0.6, 0, 0);
+  Lg[0].rotation.set(0, 0, 0); Lg[1].rotation.set(0, 0, 0); K[0].rotation.set(0, 0, 0); K[1].rotation.set(0, 0, 0); rg.head.rotation.set(0, Math.sin(t * 0.7) * 0.2, 0); rg.pick.visible = !PV.emote;
+  if (PV.emote) { PV.emote.t += dt; const e = PV.emote, et = e.t, nm = e.name; rg.head.rotation.set(0, 0, 0);
+    if (nm === 'dance') { const s = Math.sin(et * 9); rg.m.position.y = -1 + Math.abs(s) * 0.12; A[0].rotation.set(2.8 + s * 0.7, 0, 0.5); A[1].rotation.set(2.8 - s * 0.7, 0, -0.5); E[0].rotation.x = 1.0 + s * 0.6; E[1].rotation.x = 1.0 - s * 0.6; Lg[0].rotation.x = s * 0.6; Lg[1].rotation.x = -s * 0.6; K[0].rotation.x = -Math.abs(s) * 0.7; K[1].rotation.x = -Math.abs(Math.cos(et * 9)) * 0.7; rg.lean.rotation.y = Math.sin(et * 4.5) * 0.7; }
+    else if (nm === 'wave') { A[1].rotation.set(0, 0, -2.7 + Math.sin(et * 12) * 0.3); E[1].rotation.x = 0.4 + Math.sin(et * 12) * 0.5; rg.head.rotation.z = 0.08; }
+    else if (nm === 'flex') { A[0].rotation.set(0.2, 0, 2.2 + Math.sin(et * 6) * 0.1); A[1].rotation.set(0.2, 0, -2.2 - Math.sin(et * 6) * 0.1); E[0].rotation.x = E[1].rotation.x = 1.6; rg.m.position.y = -1 + Math.abs(Math.sin(et * 6)) * 0.04; }
+    else { rg.lean.rotation.y = et * 9; A[0].rotation.set(2.2, 0, 0.9); A[1].rotation.set(2.2, 0, -0.9); rg.m.position.y = -1 + Math.max(0, Math.sin(et * 5)) * 0.3; }
+    if (et > (nm === 'spin' ? 1.4 : 3.4)) { PV.emote = null; rg.lean.rotation.y = 0; } } else rg.lean.rotation.y = 0;
+  const c = PV.cam, dist = Math.max(6.7, 1.2 / (Math.tan(15 * Math.PI / 180) * asp));
+  const want = (G.LobbyUI && G.LobbyUI.tab() !== 'play' && !port) ? 0.2 : 0; PV.shift += (want - PV.shift) * Math.min(1, dt * 6);
+  c.aspect = asp; c.setViewOffset(W, H, PV.shift * W, port ? -H * 0.04 : 0, W, H); c.position.set(0, 1.55, -dist); c.lookAt(0, port ? 1.2 : 1.05, 0); c.updateProjectionMatrix();
+  const rd = renderer; rd.setScissorTest(false); rd.setViewport(0, 0, W, H); rd.autoClear = true; rd.render(PV.scene, c);
+  if (G.LobbyUI) G.LobbyUI.layout(c, W, H);
 }
 
 /* ================= match flow ================= */
@@ -483,7 +492,7 @@ G.simStep = simStep;
 function frame(ts) {
   requestAnimationFrame(frame); const rawDt = (ts - lastT) / 1000 || 0.016, dt = Math.min(0.05, rawDt); lastT = ts; if (rawDt < 0.5) G.Q.tick(rawDt);
   if (state.phase === 'loading') return;
-  if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); G.World.cullTrees(camera, 1500); renderer.render(scene, camera); pvRender(dt); return; }
+  if (state.phase === 'lobby') { pvRender(dt); return; }
   if (!state.paused && !state.helpOpen) simStep(dt);
   { const vw = G.view || G.player; G.Audio.ambTick(dt, vw.y, vw.speedNow || 0); } updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt); G.World.cullTrees(camera, G.cullFar);
   uiT -= dt; G.UI.update(dt); if (G.touchOn) touchUpdate(); G.UI.drawMini(); if (state.mapOpen) G.UI.drawBig();

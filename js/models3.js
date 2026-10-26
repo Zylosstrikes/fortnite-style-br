@@ -86,6 +86,8 @@ function buildPick(kind) {
 
 /* ================= outfits ================= */
 G.OUTFITS = [
+  { id: 'default', name: 'Default', top: 0xdde3ec, top2: 0xf4f4f4, pants: 0x35517e, boots: 0xf2f2f2, glove: 0, pack: 0, packT: 'none', head: null, hair: 'short', hairC: 0x6b4a2e },
+  { id: 'hero', name: 'Street Hoodie', top: 0x1b1d26, top2: 0xf4f4f4, pants: 0x262a36, boots: 0xf4f4f4, glove: 0, pack: 0, packT: 'none', head: null, hair: 'short', hairC: 0xf3e6a0 },
   { id: 'ranger', name: 'Trail Ranger', top: 0x3f9a4a, top2: 0xf0e2a6, pants: 0x8a6a3a, boots: 0x5a3a22, glove: 0x5a3a22, pack: 0x7a6a30, packT: 'round', head: 'cap', headC: 0x3f9a4a, hair: 'short', hairC: 0x6a4026 },
   { id: 'neon', name: 'Neon Drifter', top: 0xff4fa8, top2: 0x35e0ff, pants: 0x232633, boots: 0xffffff, glove: 0x232633, pack: 0x35e0ff, packT: 'box', head: null, hair: 'spiky', hairC: 0x35e0ff, glasses: 'visor' },
   { id: 'frost', name: 'Frost Guard', top: 0xeaf4ff, top2: 0x3fa0ff, pants: 0x2d5fb0, boots: 0x34405a, glove: 0x3fa0ff, pack: 0x3fa0ff, packT: 'box', head: 'beanie', headC: 0x3fa0ff, hair: 'short', hairC: 0xd8b07a },
@@ -125,7 +127,8 @@ function buildSegments(skin) {
   if (robot) { t.box(0.34, 0.2, 0.04, 0x1d2530, 0, 1.28, -0.215); t.box(0.26, 0.12, 0.03, 0x3fd0ff, 0, 1.28, -0.235, 0, 0, 0, true); }
   // backpack
   const pk = O.pack, pt = O.packT;
-  if (pt === 'round') { t.sph(0.22, pk, 0, 1.25, 0.37, 1, 1.1, 0.8); t.box(0.3, 0.12, 0.1, trim, 0, 1.12, 0.52); }
+  if (pt === 'none') { /* no backpack */ }
+  else if (pt === 'round') { t.sph(0.22, pk, 0, 1.25, 0.37, 1, 1.1, 0.8); t.box(0.3, 0.12, 0.1, trim, 0, 1.12, 0.52); }
   else if (pt === 'cape') { t.box(0.72, 0.85, 0.05, pk, 0, 1.1, 0.26, 0.05, 0, 0); t.box(0.78, 0.08, 0.08, GOLD, 0, 1.52, 0.24, 0, 0, 0, true); }
   else if (pt === 'roll') { t.box(0.46, 0.46, 0.2, pk, 0, 1.2, 0.3); t.cyl(0.13, 0.52, 0xd9c9a0, 0, 1.48, 0.3, 'x'); }
   else { t.box(0.46, 0.54, 0.22, pk, 0, 1.2, 0.31); t.box(0.38, 0.2, 0.05, trim, 0, 1.1, 0.43); t.box(0.1, 0.5, 0.24, top2, 0.12, 1.2, 0.31); }
@@ -190,15 +193,15 @@ function segGeos(skin) {
 /* head parts were authored around the head pivot: bake the pivot offset only for the low LOD merge (done above); torso etc. are absolute. */
 const HOLD = { pistol: { z: -0.12, s: 1.25, mz: -0.36 }, dual: { z: -0.12, s: 1.3, mz: -0.36 }, shotgun: { z: -0.2, s: 1.05, mz: -0.98 }, ar: { z: -0.2, s: 1.0, mz: -1.2 }, smg: { z: -0.12, s: 1.1, mz: -0.72 }, sniper: { z: -0.05, s: 0.82, mz: -1.56 }, rocket: { z: 0.12, s: 0.85, mz: -1.28, f: 2 } };
 G.makeCharacter = function (skin) {
-  const E = segGeos(skin), GG = E.geos, O = E.O; const mat = G.vcMat, om = G.outlineMat;
+  const E = segGeos(skin), GG = E.geos, O = E.O; const mat = G.vcMat, om = G.outlineMat; const PV = GG.piv || { shx: 0.46, hipx: 0.17 };
   const root = new T.Group(), lean = new T.Group(), m = new T.Group(); lean.position.y = 1; m.position.y = -1; root.add(lean); lean.add(m);
   const hi = new T.Group(); m.add(hi); const outlines = [];
   const seg = (geo, parent, px, py, pz) => { const g = new T.Group(); g.position.set(px, py, pz); parent.add(g); const me = new T.Mesh(geo, mat); me.castShadow = true; g.add(me); const ol = new T.Mesh(geo, om); ol.renderOrder = -1; g.add(ol); outlines.push(ol); return g; };
   seg(GG.torso, hi, 0, 0, 0);
-  const head = seg(GG.head, hi, 0, 1.76, 0); head.scale.setScalar(1.12); const legs = [], knees = [], arms = [], elbows = [];
+  const head = seg(GG.head, hi, 0, 1.76, 0); head.scale.setScalar(GG.piv ? 1.0 : 1.12); const legs = [], knees = [], arms = [], elbows = [];
   for (let i = 0; i < 2; i++) { const s = i === 0 ? -1 : 1;
-    const hip = seg(GG.thigh[i], hi, s * 0.17, 0.84, 0); const knee = seg(GG.shin[i], hip, 0, -0.42, 0); legs.push(hip); knees.push(knee);
-    const sh = seg(GG.uarm[i], hi, s * 0.46, 1.4, 0); const el = seg(GG.farm[i], sh, 0, -0.4, 0); arms.push(sh); elbows.push(el); }
+    const hip = seg(GG.thigh[i], hi, s * PV.hipx, 0.84, 0); const knee = seg(GG.shin[i], hip, 0, -0.42, 0); legs.push(hip); knees.push(knee);
+    const sh = seg(GG.uarm[i], hi, s * PV.shx, 1.4, 0); const el = seg(GG.farm[i], sh, 0, -0.4, 0); arms.push(sh); elbows.push(el); }
   const low = new T.Mesh(GG.low, mat); low.castShadow = false; low.visible = false; m.add(low);
   const gun = new T.Group(); gun.position.set(0.12, 1.3, -0.3); m.add(gun);
   const pick = G.pickaxeModel(skin.pick); pick.position.set(0, -0.62, 0); pick.rotation.x = Math.PI / 2; arms[1].add(pick); elbows[1].add(pick); pick.position.set(0, -0.3, 0); pick.visible = false;

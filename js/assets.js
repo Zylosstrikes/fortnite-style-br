@@ -8,7 +8,7 @@
 (function () {
 const G = window.G, T = THREE;
 const A = G.Assets = { base: 'assets/models/', files: {}, scenes: {}, status: {}, used: {}, enabled: !/[?&]noassets/.test(location.search) && typeof T.GLTFLoader === 'function' };
-const DEFAULT_FILES = ['weapons', 'glider', 'bus', 'chest_wood', 'chest_metal', 'heals', 'llama', 'trees', 'char_ranger', 'char_neon', 'char_frost', 'char_gold', 'char_shadow', 'char_beach', 'char_knight', 'char_circuit', 'char_dino', 'char_cow', 'char_lab', 'char_punk'];
+const DEFAULT_FILES = ['weapons', 'glider', 'bus', 'chest_wood', 'chest_metal', 'heals', 'llama', 'trees', 'char_default', 'char_hero', 'char_ranger', 'char_neon', 'char_frost', 'char_gold', 'char_shadow', 'char_beach', 'char_knight', 'char_circuit', 'char_dino', 'char_cow', 'char_lab', 'char_punk'];
 const TIMEOUT = 9000;
 
 /* ---------------- loading ---------------- */
@@ -83,7 +83,10 @@ function charGeos(skin, O) {
   const seg = (name) => { const n = find(root, name); if (!n) throw new Error('missing node ' + name); return bake(directMeshes(n), roles, { outline: true, glowAsLit: true }).lit || new T.BufferGeometry(); };
   try {
     const GG = { torso: seg('torso'), head: seg('head'), uarm: [seg('arm_L'), seg('arm_R')], farm: [seg('forearm_L'), seg('forearm_R')], thigh: [seg('leg_L'), seg('leg_R')], shin: [seg('shin_L'), seg('shin_R')] };
-    GG.low = bake(allMeshes(root), roles, { glowAsLit: true }).lit; used('char'); return GG;
+    const lod = find(root, 'lod_low'); // human models ship a decimated far-LOD mesh and use their own pivot widths
+    GG.low = bake(lod ? allMeshes(lod, root) : allMeshes(root), roles, { glowAsLit: true }).lit;
+    if (lod) GG.piv = { shx: 0.29, hipx: 0.12, human: true };
+    used('char'); return GG;
   } catch (e) { console.warn('char glb ' + O.id + ':', e.message); return null; }
 }
 A.charGeos = charGeos;

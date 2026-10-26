@@ -40,6 +40,7 @@ def material(col, glow=False):
         name, hx = ('G_' if glow else 'C_') + '%06x' % col, col
     m = bpy.data.materials.new(name)
     m.use_nodes = True
+    m.diffuse_color = hexrgb(hx) + (1,)
     b = m.node_tree.nodes['Principled BSDF']
     b.inputs['Base Color'].default_value = hexrgb(hx) + (1,)
     b.inputs['Roughness'].default_value = 0.9
