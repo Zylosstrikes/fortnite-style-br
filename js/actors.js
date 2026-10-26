@@ -14,7 +14,7 @@ const FX = G.FX = {
     this.scene = scene; this.N = 700;
     this.mesh = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xffffff }), this.N); this.mesh.frustumCulled = false; this.mesh.count = 0; scene.add(this.mesh);
     for (let i = 0; i < 40; i++) { const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false })); m.visible = false; scene.add(m); this.tr.push({ m, life: 0 }); }
-    for (let i = 0; i < 6; i++) { const m = new T.Mesh(new T.SphereGeometry(1, 12, 8), new T.MeshBasicMaterial({ color: 0xffa83a, transparent: true, opacity: 0.8, blending: T.AdditiveBlending, depthWrite: false })); m.visible = false; scene.add(m); this.ex.push({ m, life: 0, r: 1 }); }
+    for (let i = 0; i < 6; i++) { const m = new T.Mesh(new T.SphereGeometry(1, 12, 8), new T.MeshBasicMaterial({ color: 0xffa83a, transparent: true, opacity: 0.8, blending: T.AdditiveBlending, depthWrite: false, fog: false })); m.visible = false; scene.add(m); const ring = new T.Mesh(new T.RingGeometry(0.72, 1, 28), new T.MeshBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: 0.7, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false })); ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring); this.ex.push({ m, ring, life: 0, r: 1 }); }
     this.dummy = new T.Object3D(); this.col = new T.Color();
   },
   spawn(x, y, z, vx, vy, vz, color, size, life, grav) { if (this.P.length >= this.N) this.P.shift(); this.P.push({ x, y, z, vx, vy, vz, color, size, life, max: life, grav: grav === undefined ? 14 : grav }); },
@@ -22,9 +22,10 @@ const FX = G.FX = {
   debris(x, y, z, color, n) { this.burst(x, y, z, color, n || 8, 7, 0.22, 0.9, 16); },
   tracer(ox, oy, oz, px, py, pz, color) {
     const t = this.tr.find(q => q.life <= 0); if (!t) return; const dx = px - ox, dy = py - oy, dz = pz - oz, len = Math.hypot(dx, dy, dz); if (len < 1) return;
-    t.m.position.set((ox + px) / 2, (oy + py) / 2, (oz + pz) / 2); t.m.lookAt(px, py, pz); t.m.scale.set(0.035, 0.035, len); t.m.material.color.setHex(color || 0xfff2a8); t.m.visible = true; t.life = 0.07;
+    t.m.position.set((ox + px) / 2, (oy + py) / 2, (oz + pz) / 2); t.m.lookAt(px, py, pz); t.m.scale.set(0.05, 0.05, Math.min(len, 60)); if (len > 60) t.m.position.set(ox + dx / len * 30, oy + dy / len * 30, oz + dz / len * 30); t.m.material.color.setHex(color || 0xfff2a8); t.m.visible = true; t.life = 0.1;
   },
-  explosion(x, y, z, r) { const e = this.ex.find(q => q.life <= 0) || this.ex[0]; e.m.position.set(x, y, z); e.life = 0.5; e.r = r; e.m.visible = true; this.burst(x, y, z, 0xff8a2a, 26, 18, 0.5, 0.8, 4); this.burst(x, y, z, 0xffe07a, 16, 12, 0.35, 0.6, 2); this.burst(x, y + 0.5, z, 0x555555, 18, 8, 0.8, 1.4, -1); },
+  explosion(x, y, z, r) { const e = this.ex.find(q => q.life <= 0) || this.ex[0]; e.m.position.set(x, y, z); e.ring.position.set(x, y + 0.15, z); e.life = 0.6; e.r = r; e.m.visible = true; e.ring.visible = true; const fs = G.fxScale || 1; this.burst(x, y, z, 0xff8a2a, Math.round(30 * fs), 18, 0.55, 0.8, 4); this.burst(x, y, z, 0xffe07a, Math.round(18 * fs), 12, 0.38, 0.6, 2); this.burst(x, y + 0.5, z, 0x4a4a52, Math.round(22 * fs), 8, 1.1, 1.8, -1.5); this.burst(x, y + 0.3, z, 0xffcf5a, Math.round(24 * fs), 30, 0.14, 1.1, 14); },
+  hit(x, y, z, color, n) { const fs = G.fxScale || 1; this.burst(x, y, z, color, Math.max(2, Math.round((n || 5) * fs)), 7, 0.1, 0.35, 14); this.spawn(x, y, z, 0, 0, 0, 0xffffff, 0.45, 0.07, 0); this.spawn(x, y, z, 0, 0.4, 0, color, 0.28, 0.2, -2); },
   update(dt) {
     const d = this.dummy, m = this.mesh; let n = 0;
     for (let i = this.P.length - 1; i >= 0; i--) {
@@ -34,7 +35,7 @@ const FX = G.FX = {
     for (const p of this.P) { const s = p.size * Math.min(1, p.life / p.max * 2); d.position.set(p.x, p.y, p.z); d.scale.set(s, s, s); d.rotation.set(p.x, p.y, 0); d.updateMatrix(); m.setMatrixAt(n, d.matrix); this.col.setHex(p.color); m.setColorAt(n, this.col); n++; }
     m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
     for (const t of this.tr) if (t.life > 0) { t.life -= dt; if (t.life <= 0) t.m.visible = false; }
-    for (const e of this.ex) if (e.life > 0) { e.life -= dt; const k = 1 - e.life / 0.5; e.m.scale.setScalar(Math.max(0.1, e.r * (0.2 + k * 0.9))); e.m.material.opacity = Math.max(0, 0.8 * (1 - k)); if (e.life <= 0) e.m.visible = false; }
+    for (const e of this.ex) if (e.life > 0) { e.life -= dt; const k = 1 - e.life / 0.6; e.m.scale.setScalar(Math.max(0.1, e.r * (0.2 + k * 0.9))); e.m.material.opacity = Math.max(0, 0.8 * (1 - k * k)); e.ring.scale.setScalar(Math.max(0.1, e.r * (0.3 + k * 2.1))); e.ring.material.opacity = Math.max(0, 0.75 * (1 - k)); if (e.life <= 0) { e.m.visible = false; e.ring.visible = false; } }
     this.shake = Math.max(0, this.shake - dt * 2.5);
   }
 };
@@ -174,9 +175,9 @@ G.tryFire = function (a, tx, ty, tz) {
     const px = h.x, py = h.y, pz = h.z; FXtrace(a, m, px, py, pz, it);
     if (h.actor) {
       let dmg = Wp.dmg * R.mult * (h.head ? Wp.hs : 1); const fall = Wp.pellets > 1 ? G.clamp(1.1 - (h.t - 5) / (Wp.range * 0.8), 0.15, 1) : G.clamp(1 - h.t / Wp.range * 0.3, 0.6, 1); dmg *= fall;
-      FX.burst(px, py, pz, 0xff4d4d, 4, 4, 0.12, 0.4, 10); G.damageActor(h.actor, dmg, a, h.head, Wp.short); hitAny = true;
-    } else if (h.box) { const b = h.box; FX.burst(px, py, pz, b.col || 0xdddddd, 3, 4, 0.12, 0.4, 12); if (b.destructible && b.kind !== 'tree' && b.kind !== 'rock') G.damageBox(b, Wp.dmg * R.mult * (Wp.pellets > 1 ? 1 : 1.2), a); }
-    else if (h.terrain) FX.burst(px, py, pz, 0xb7a06a, 3, 3, 0.12, 0.4, 12);
+      FX.hit(px, py, pz, 0xff4d4d, 6); G.damageActor(h.actor, dmg, a, h.head, Wp.short); hitAny = true;
+    } else if (h.box) { const b = h.box; FX.hit(px, py, pz, b.col || 0xdddddd, 4); if (b.destructible && b.kind !== 'tree' && b.kind !== 'rock') G.damageBox(b, Wp.dmg * R.mult * (Wp.pellets > 1 ? 1 : 1.2), a); }
+    else if (h.terrain) FX.hit(px, py, pz, 0xb7a06a, 4);
   }
   return true;
 };
@@ -345,7 +346,7 @@ function groundMove(a, dt) {
   a.inWater = a.onGround && !Wd.support && Wd.heightAt(a.x, a.z) < G.WATER_Y - 0.1;
   a.speedNow = Math.hypot(a.vx, a.vz);
   // footsteps
-  if (a.onGround && a.speedNow > 2.5) { a.stepT -= dt * (a.speedNow / 5.6); if (a.stepT <= 0) { a.stepT = 0.42; if (a.inWater) G.Audio.at('splash', a.x, a.y, a.z, 0.4); else G.Audio.at('step', a.x, a.y, a.z, a.isPlayer ? 0.8 : 0.6); } }
+  if (a.onGround && a.speedNow > 2.5) { a.stepT -= dt * (a.speedNow / 5.6); if (a.stepT <= 0) { a.stepT = 0.42; if (a.inWater) G.Audio.at('splash', a.x, a.y, a.z, 0.4); else G.Audio.at(Wd.support ? 'stepb' : a.y < 3.2 ? 'steps' : 'step', a.x, a.y, a.z, a.isPlayer ? 0.8 : 0.6); } }
   if (a.y < -30) G.killActor(a, null, 'Fall');
 }
 G.updateActor = function (a, dt) {
@@ -386,12 +387,12 @@ G.updateActor = function (a, dt) {
 function openGlider(a) { a.state = 'glide'; a.glideOpen = true; a.rig.glider.visible = true; a.rig.lean.rotation.x = -0.05; if (a.isPlayer) G.Audio.play('glide'); else G.Audio.at('glide', a.x, a.y, a.z, 0.5); }
 G.openGlider = openGlider;
 G.jumpFromBus = function (a, bus) {
-  a.state = "freefall"; a.jumpedAt = G.time; a.x = bus.x; a.y = bus.y - 3; a.z = bus.z; a.vx = bus.vx * 0.7; a.vz = bus.vz * 0.7; a.vy = -2; a.yaw = a.isPlayer ? a.yaw : a.yaw; a.rig.root.visible = true; G.Audio.at('jump', a.x, a.y, a.z, 0.6);
+  a.state = "freefall"; a.jumpedAt = G.time; a.x = bus.x; a.y = bus.y - 3; a.z = bus.z; a.vx = bus.vx * 0.7; a.vz = bus.vz * 0.7; a.vy = -2; a.yaw = a.isPlayer ? a.yaw : a.yaw; a.rig.root.visible = true; a.rig.setLOD(2); G.Audio.at('jump', a.x, a.y, a.z, 0.6);
 };
 G.startEmote = function (a, name) { if (!a.alive || a.state !== 'ground' || a.vehicle) return; a.emote = { name, t: 0, dur: name === 'wave' ? 2.4 : 3.6 }; a.reloading = 0; G.Audio.at('emote', a.x, a.y, a.z, 0.8); };
 
 /* ---------- rig animation ---------- */
-function animate(a, dt) {
+function animateBase(a, dt) {
   const r = a.rig; r.root.position.set(a.x, a.y, a.z); r.root.rotation.set(0, a.yaw, 0);
   const L = r.legs, A = r.arms; r.lean.rotation.set(0, 0, 0); r.m.position.y = -1; L[0].rotation.set(0, 0, 0); L[1].rotation.set(0, 0, 0); A[0].rotation.set(0, 0, 0); A[1].rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0);
   if (!a.alive) { const k = Math.min(1, a.deadT / 0.4); r.lean.rotation.x = k * 1.55; r.lean.position.y = 1 - k * 0.5; r.root.rotation.y = a.yaw; return; }
@@ -416,6 +417,27 @@ function animate(a, dt) {
   else if (it && it.type === 'pickaxe') { const k = a.swing > 0 ? Math.min(1, a.swing / 0.35) : 0; A[1].rotation.x = a.swing > 0 ? (k < 0.4 ? 2.9 - k * 1.0 : 2.5 - (k - 0.4) / 0.6 * 1.9) : 0.35 - sw * 0.5; A[0].rotation.x = -sw * 0.8; r.pick.visible = true; }
   else if (a.action) { A[0].rotation.set(2.0, 0, 0.5); A[1].rotation.set(2.0 + Math.sin(a.action.t * 8) * 0.15, 0, -0.5); }
   else { A[0].rotation.x = -sw * 0.8; A[1].rotation.x = sw * 0.8; }
+}
+/* v2: elbow / knee articulation + head look on top of the base pose */
+function animate(a, dt) {
+  animateBase(a, dt); const r = a.rig; if (!r.knees) return; const K = r.knees, E = r.elbows, A = r.arms;
+  K[0].rotation.x = K[1].rotation.x = E[0].rotation.x = E[1].rotation.x = 0;
+  if (!a.alive) { E[0].rotation.x = E[1].rotation.x = 0.5; K[0].rotation.x = K[1].rotation.x = -0.4; return; }
+  const st = a.state;
+  if (st === 'freefall') { K[0].rotation.x = -0.9; K[1].rotation.x = -0.5; E[0].rotation.x = E[1].rotation.x = 0.35; return; }
+  if (st === 'glide') { K[0].rotation.x = -0.7; K[1].rotation.x = -0.2; E[0].rotation.x = E[1].rotation.x = 0.15; return; }
+  if (a.vehicle) { K[0].rotation.x = K[1].rotation.x = -1.35; E[0].rotation.x = E[1].rotation.x = 0.35; return; }
+  const sp = a.speedNow || 0, amp = Math.min(1, sp / 4), p = a.walkPhase;
+  if (!a.onGround) { K[0].rotation.x = -0.9; K[1].rotation.x = -0.5; E[0].rotation.x = E[1].rotation.x = 0.5; }
+  else { K[0].rotation.x = -0.95 * amp * Math.max(0, Math.cos(p)); K[1].rotation.x = -0.95 * amp * Math.max(0, -Math.cos(p)); if (a.crouch) { K[0].rotation.x -= 0.5; K[1].rotation.x -= 0.5; }
+    const sw = Math.sin(p) * amp; E[0].rotation.x = 0.18 + 0.5 * amp * Math.max(0, sw); E[1].rotation.x = 0.18 + 0.5 * amp * Math.max(0, -sw); }
+  const it = a.inv && a.inv[a.sel];
+  if (a.emote) { const t = a.emote.t, nm = a.emote.name; if (nm === 'wave') E[1].rotation.x = 0.4 + Math.sin(t * 12) * 0.5; else if (nm === 'dance') { E[0].rotation.x = 1.0 + Math.sin(t * 9) * 0.6; E[1].rotation.x = 1.0 - Math.sin(t * 9) * 0.6; K[0].rotation.x = -Math.abs(Math.sin(t * 9)) * 0.7; K[1].rotation.x = -Math.abs(Math.cos(t * 9)) * 0.7; } else if (nm === 'flex') { E[0].rotation.x = E[1].rotation.x = 1.6; } else { E[0].rotation.x = E[1].rotation.x = 0.9; } return; }
+  if (a.buildMode) { E[0].rotation.x = E[1].rotation.x = 0.7; r.head.rotation.x = a.pitch * 0.4; return; }
+  if (it && (it.type === 'weapon' || it.type === 'gadget')) { E[1].rotation.x = 0.8 - (a.recoil || 0) * 3; E[0].rotation.x = 0.12; }
+  else if (it && it.type === 'pickaxe') { const k = a.swing > 0 ? Math.min(1, a.swing / 0.35) : 0; E[1].rotation.x = a.swing > 0 ? (k < 0.4 ? 1.1 : 0.1) : 0.35; }
+  else if (a.action) { E[0].rotation.x = 1.3; E[1].rotation.x = 1.3; }
+  r.head.rotation.x = G.clamp((a.pitch || 0) * 0.5, -0.5, 0.5);
 }
 G.animateRig = animate;
 

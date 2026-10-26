@@ -309,7 +309,7 @@ function terrainMesh() {
     const sl = Math.hypot(heights[iz * W1 + Math.min(N, ix + 1)] - heights[iz * W1 + Math.max(0, ix - 1)], heights[Math.min(N, iz + 1) * W1 + ix] - heights[Math.max(0, iz - 1) * W1 + ix]) / (2 * CELLV);
     surfaceColor(x, z, h, sl, c); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
-  // smooth normals over the whole grid (no seams), sliced into frustum-culled chunks
+  // smooth normals over the whole grid (so chunk borders have no seams), then slice into frustum-culled chunks
   const nor = new Float32Array(W1 * W1 * 3);
   for (let iz = 0; iz <= N; iz++) for (let ix = 0; ix <= N; ix++) { const hx = heights[iz * W1 + Math.min(N, ix + 1)] - heights[iz * W1 + Math.max(0, ix - 1)], hz = heights[Math.min(N, iz + 1) * W1 + ix] - heights[Math.max(0, iz - 1) * W1 + ix]; const nx = -hx / (2 * CELLV), nz = -hz / (2 * CELLV), l = Math.hypot(nx, 1, nz); const i = iz * W1 + ix; nor[i * 3] = nx / l; nor[i * 3 + 1] = 1 / l; nor[i * 3 + 2] = nz / l; }
   const grp = new T.Group(), CS = 25, mat = new T.MeshLambertMaterial({ vertexColors: true });
@@ -345,11 +345,22 @@ W.build = function (scene) {
   for (let iz = 0; iz <= N; iz++) for (let ix = 0; ix <= N; ix++) heights[iz * (N + 1) + ix] = Hfull(-HALF + ix * CELLV, -HALF + iz * CELLV);
   scene.add(terrainMesh());
   // water
-  const wc = document.createElement('canvas'); wc.width = wc.height = 128; const wx = wc.getContext('2d'); wx.fillStyle = '#3cb8ea'; wx.fillRect(0, 0, 128, 128);
-  for (let i = 0; i < 60; i++) { wx.fillStyle = 'rgba(255,255,255,' + R(0.05, 0.2) + ')'; wx.beginPath(); wx.ellipse(R(0, 128), R(0, 128), R(4, 14), R(1, 3), 0, 0, 6.3); wx.fill(); }
-  const wt = new T.CanvasTexture(wc); wt.wrapS = wt.wrapT = T.RepeatWrapping; wt.repeat.set(160, 160); W.waterTex = wt;
-  const water = new T.Mesh(new T.PlaneGeometry(6000, 6000), new T.MeshPhongMaterial({ map: wt, color: 0xffffff, transparent: true, opacity: 0.8, shininess: 90, specular: 0x99ccee }));
-  water.rotation.x = -Math.PI / 2; water.position.y = G.WATER_Y; scene.add(water);
+  { // stylised water: depth-tinted (from a baked terrain height texture), animated ripples + foam at the shore
+    const TS = 256, hd = new Uint8Array(TS * TS * 4); for (let zi = 0; zi < TS; zi++) for (let xi = 0; xi < TS; xi++) { const h = heightAt(-HALF + (xi + 0.5) / TS * SZ, -HALF + (zi + 0.5) / TS * SZ); const v = Math.max(0, Math.min(255, Math.round((h + 40) / 120 * 255))); const o = (zi * TS + xi) * 4; hd[o] = hd[o + 1] = hd[o + 2] = v; hd[o + 3] = 255; }
+    const ht = new T.DataTexture(hd, TS, TS, T.RGBAFormat); ht.magFilter = ht.minFilter = T.LinearFilter; ht.needsUpdate = true;
+    const wu = T.UniformsUtils.merge([T.UniformsLib.fog, { time: { value: 0 }, hmap: { value: ht }, halfS: { value: HALF }, wy: { value: G.WATER_Y }, sunDir: { value: new T.Vector3(0.45, 0.75, 0.3).normalize() } }]); W.waterU = wu;
+    const wm = new T.ShaderMaterial({ transparent: true, fog: true, uniforms: wu, depthWrite: false,
+      vertexShader: 'varying vec3 vW;\n#include <fog_pars_vertex>\nvoid main(){ vec4 wp = modelMatrix*vec4(position,1.0); vW = wp.xyz; vec4 mvPosition = viewMatrix*wp; gl_Position = projectionMatrix*mvPosition;\n#include <fog_vertex>\n}',
+      fragmentShader: 'uniform float time; uniform sampler2D hmap; uniform float halfS; uniform float wy; uniform vec3 sunDir; varying vec3 vW;\n#include <fog_pars_fragment>\n' +
+        'float hs(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); } float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hs(i),hs(i+vec2(1,0)),f.x), mix(hs(i+vec2(0,1)),hs(i+vec2(1,1)),f.x), f.y); }\n' +
+        'void main(){ vec2 uv = vW.xz/(halfS*2.0)+0.5; float h = texture2D(hmap, uv).r*120.0-40.0; if (abs(uv.x-0.5)>0.5||abs(uv.y-0.5)>0.5) h = -40.0; float dep = clamp(wy - h, 0.0, 30.0);\n' +
+        'vec2 p = vW.xz*0.35; float w1 = vn(p + vec2(time*0.6, time*0.35)), w2 = vn(p*2.3 - vec2(time*0.5, -time*0.4)); float rip = w1*0.6+w2*0.4;\n' +
+        'vec3 shallow = vec3(0.28,0.86,0.9), deep = vec3(0.08,0.38,0.8); vec3 c = mix(shallow, deep, smoothstep(0.2, 9.0, dep)); c += (rip-0.5)*0.16;\n' +
+        'float fo = smoothstep(1.1, 0.0, dep + (w1-0.5)*0.9 + sin(time*1.6 + vW.x*0.2 + vW.z*0.17)*0.18); c = mix(c, vec3(0.95,0.99,1.0), fo*0.85);\n' +
+        'float cd = length(vW-cameraPosition); float near = 1.0-smoothstep(60.0,350.0,cd); float spec = pow(max(0.0, 1.0 - abs(rip-0.62)*5.0), 3.0)*0.3*(1.0-fo)*near; c += spec; c = mix(vec3(0.0)+mix(shallow,deep,smoothstep(0.2,9.0,dep)), c, 0.55+0.45*near);\n' +
+        'gl_FragColor = vec4(c, mix(0.55, 0.9, smoothstep(0.0, 3.0, dep)) + fo*0.1);\n#include <fog_fragment>\n}' });
+    const water = new T.Mesh(new T.PlaneGeometry(6000, 6000), wm); water.rotation.x = -Math.PI / 2; water.position.y = G.WATER_Y; water.renderOrder = 1; scene.add(water);
+  }
   // buildings
   const stylePoi = {};
   function placeBuildings(p) {
@@ -409,35 +420,44 @@ W.build = function (scene) {
     const pine = h > 22 || rng() < 0.45; const t = { x, z, y: h, s: R(0.8, 1.45), pine, hp: 6, dead: false, insts: [] };
     (pine ? pines : oaks).push(t); W.trees.push(t); tcount++;
   }
-  const trunkGeo = new T.CylinderGeometry(0.22, 0.34, 1, 6); trunkGeo.translate(0, 0.5, 0);
-  const coneGeo = new T.ConeGeometry(1.9, 3.2, 7); coneGeo.translate(0, 1.6, 0); const cone2Geo = new T.ConeGeometry(1.4, 2.6, 7); cone2Geo.translate(0, 1.3, 0);
-  const oakGeo = new T.IcosahedronGeometry(2.0, 0);
-  const tMat = new T.MeshLambertMaterial({ color: 0x8a5a33 }), fMat = new T.MeshLambertMaterial({ color: 0xffffff });
-  // spatial chunks: instanced meshes can't use three's built-in culling, so each chunk is shown/hidden by W.cullTrees() every frame
+  const BdT = G.Builder, greyc = v => (Math.round(v * 255) << 16) | (Math.round(v * 255) << 8) | Math.round(v * 255);
+  const trb = new BdT(); trb.cyl(0.22, 1, 0xffffff, 0, 0.5, 0, 'y', 0.34, 6); trb.cyl(0.5, 0.35, 0xdfdfdf, 0, 0.1, 0, 'y', 0.5, 6);
+  const AG = G.Assets && G.Assets.treeGeos && G.Assets.treeGeos();
+  const trunkGeo = AG ? AG.trunk : trb.geometry(trb.lit);
+  const pnb = new BdT(); [[2.15, 2.3, 0.0, 0.74], [1.75, 2.3, 1.15, 0.86], [1.3, 2.2, 2.3, 0.96], [0.85, 1.8, 3.35, 1.0]].forEach(([r, h, y, v]) => pnb.cone(r, h, greyc(v), 0, y + h / 2, 0, 0, 0, 0, 7));
+  const coneGeo = AG ? AG.pine : pnb.geometry(pnb.lit);
+  const okb = new BdT(); okb.ico(1.7, greyc(0.9), 0, 0.2, 0, 1.05, 0.85, 1.05, 1); okb.ico(1.2, greyc(1.0), 0.9, 0.95, 0.2, 1, 0.9, 1, 0); okb.ico(1.1, greyc(0.98), -0.8, 0.8, -0.5, 1, 0.9, 1, 0); okb.ico(1.0, greyc(0.8), 0.2, -0.45, 0.9, 1, 0.8, 1, 0); okb.ico(0.9, greyc(1.0), -0.2, 1.5, 0.1, 1, 0.9, 1, 0);
+  const oakGeo = AG ? AG.oak : okb.geometry(okb.lit);
+  const nT = W.trees.length, nP = Math.max(1, pines.length), nO = Math.max(1, oaks.length);
+  const tMat = new T.MeshLambertMaterial({ vertexColors: true, color: 0x9a6a3c }), fMat = new T.MeshLambertMaterial({ vertexColors: true });
+  // spatial chunks (frustum culled manually every frame; instanced meshes can't use three's built-in culling)
   const CH = 110, chunks = new Map(); const chunkOf = (x, z) => { const k = Math.floor((x + 600) / CH) + ',' + Math.floor((z + 600) / CH); let c = chunks.get(k); if (!c) { c = { nT: 0, nP: 0, nO: 0, x0: Math.floor((x + 600) / CH) * CH - 600, z0: Math.floor((z + 600) / CH) * CH - 600 }; chunks.set(k, c); } return c; };
   for (const t of W.trees) { const c = chunkOf(t.x, t.z); t.c = c; c.nT++; if (t.pine) c.nP++; else c.nO++; }
   W.treeChunks = [];
   for (const c of chunks.values()) {
-    c.mTrunk = new T.InstancedMesh(trunkGeo, tMat, c.nT); c.mP1 = c.nP ? new T.InstancedMesh(coneGeo, fMat, c.nP) : null; c.mP2 = c.nP ? new T.InstancedMesh(cone2Geo, fMat, c.nP) : null; c.mOak = c.nO ? new T.InstancedMesh(oakGeo, fMat, c.nO) : null; c.iT = c.iP = c.iO = 0;
-    for (const m of [c.mTrunk, c.mP1, c.mP2, c.mOak]) if (m) { m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; scene.add(m); }
+    c.mT = new T.InstancedMesh(trunkGeo, tMat, c.nT); c.mP = c.nP ? new T.InstancedMesh(coneGeo, fMat, c.nP) : null; c.mO = c.nO ? new T.InstancedMesh(oakGeo, fMat, c.nO) : null; c.iT = c.iP = c.iO = 0;
+    for (const m of [c.mT, c.mP, c.mO]) if (m) { m.castShadow = true; m.frustumCulled = false; scene.add(m); }
     c.box = new T.Box3(new T.Vector3(c.x0 - 4, -20, c.z0 - 4), new T.Vector3(c.x0 + CH + 4, 120, c.z0 + CH + 4)); W.treeChunks.push(c);
   }
-  const mat4 = new T.Matrix4(), q = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), col = new T.Color();
-  const pineCols = [0x2e9a4a, 0x3aa84f, 0x278f5a, 0x4bb860], oakCols = [0x6fd24a, 0x58c43f, 0x8ada4c, 0x6fd24a, 0xf2b13a, 0xff8c5a, 0xf58fc0];
+  const mat4 = new T.Matrix4(), q = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), col = new T.Color(), UP = new T.Vector3(0, 1, 0);
+  const pineCols = [0x2e9a4a, 0x3aa84f, 0x278f5a, 0x4bb860], oakCols = [0x6fd24a, 0x58c43f, 0x8ada4c, 0x6fd24a, 0xf2b13a, 0xff8c5a, 0xf58fc0], trunkCols = [0x8a5a33, 0x9a6a3c, 0x7a4e2a];
   for (const t of W.trees) {
-    const c = t.c; q.setFromAxisAngle(new T.Vector3(0, 1, 0), R(0, 6.28));
-    const th = t.pine ? 2.2 : 2.6; ps.set(t.x, t.y - 0.2, t.z); sc.set(t.s, th * t.s, t.s); mat4.compose(ps, q, sc); c.mTrunk.setMatrixAt(c.iT, mat4); t.insts.push({ m: c.mTrunk, i: c.iT }); c.iT++;
+    const c = t.c; q.setFromAxisAngle(UP, R(0, 6.28));
+    const th = t.pine ? 2.2 : 2.6; ps.set(t.x, t.y - 0.2, t.z); sc.set(t.s, th * t.s, t.s); mat4.compose(ps, q, sc); c.mT.setMatrixAt(c.iT, mat4); col.setHex(trunkCols[Math.floor(rng() * 3)]).multiplyScalar(1.6); c.mT.setColorAt(c.iT, col); t.insts.push({ m: c.mT, i: c.iT }); c.iT++;
     if (t.pine) {
-      ps.set(t.x, t.y + th * t.s * 0.6, t.z); sc.set(t.s, t.s, t.s); mat4.compose(ps, q, sc); c.mP1.setMatrixAt(c.iP, mat4); col.setHex(pineCols[Math.floor(rng() * 4)]); if (t.y > 40) col.lerp(new T.Color(0xeaf6ff), 0.55); c.mP1.setColorAt(c.iP, col);
-      ps.set(t.x, t.y + th * t.s * 0.6 + 2.0 * t.s, t.z); mat4.compose(ps, q, sc); c.mP2.setMatrixAt(c.iP, mat4); c.mP2.setColorAt(c.iP, col); t.insts.push({ m: c.mP1, i: c.iP }, { m: c.mP2, i: c.iP }); c.iP++;
+      ps.set(t.x, t.y + th * t.s * 0.45, t.z); sc.set(t.s, t.s * 1.05, t.s); mat4.compose(ps, q, sc); c.mP.setMatrixAt(c.iP, mat4); col.setHex(pineCols[Math.floor(rng() * 4)]); if (t.y > 40) col.lerp(new T.Color(0xeaf6ff), 0.55); c.mP.setColorAt(c.iP, col); t.insts.push({ m: c.mP, i: c.iP }); c.iP++;
     } else {
-      ps.set(t.x, t.y + th * t.s + 0.8 * t.s, t.z); sc.set(t.s, t.s * 0.9, t.s); mat4.compose(ps, q, sc); c.mOak.setMatrixAt(c.iO, mat4); col.setHex(oakCols[Math.floor(rng() * oakCols.length)]); c.mOak.setColorAt(c.iO, col); t.insts.push({ m: c.mOak, i: c.iO }); c.iO++;
+      ps.set(t.x, t.y + th * t.s + 0.7 * t.s, t.z); sc.set(t.s, t.s * 0.95, t.s); mat4.compose(ps, q, sc); c.mO.setMatrixAt(c.iO, mat4); col.setHex(oakCols[Math.floor(rng() * oakCols.length)]); c.mO.setColorAt(c.iO, col); t.insts.push({ m: c.mO, i: c.iO }); c.iO++;
     }
     addBox({ x0: t.x - 0.4, x1: t.x + 0.4, z0: t.z - 0.4, z1: t.z + 0.4, y0: t.y - 1, y1: t.y + 5.5, kind: 'tree', mat: 'wood', hp: 6, tree: t, col: 0x8a5a33 }).tree = t; t.box = null;
   }
-  for (const c of W.treeChunks) for (const m of [c.mTrunk, c.mP1, c.mP2, c.mOak]) if (m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+  for (const c of W.treeChunks) for (const m of [c.mT, c.mP, c.mO]) if (m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   // rocks
-  const rockGeo = new T.IcosahedronGeometry(1, 0); const nR = 260; const mRock = new T.InstancedMesh(rockGeo, new T.MeshLambertMaterial({ color: 0xffffff }), nR); mRock.castShadow = true; mRock.frustumCulled = false; scene.add(mRock);
+  const rockGeo = (function () { const g = new T.IcosahedronGeometry(1, 1), p = g.attributes.position, cs = []; const hsh = (x, y, z) => { const n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return n - Math.floor(n); };
+    for (let k = 0; k < p.count; k++) { const x = p.getX(k), y = p.getY(k), z = p.getZ(k); const d = 0.82 + 0.3 * hsh(Math.round(x * 50), Math.round(y * 50), Math.round(z * 50)); p.setXYZ(k, x * d, y * d * (y < 0 ? 0.6 : 1), z * d); }
+    g.computeVertexNormals(); for (let k = 0; k < p.count; k += 3) { const ny = g.attributes.normal.getY(k); const v = 0.7 + 0.3 * Math.max(0, ny) + 0.08 * hsh(k, 1, 2); for (let m = 0; m < 3; m++) cs.push(v, v, v * 1.04); }
+    g.setAttribute('color', new T.Float32BufferAttribute(cs, 3)); return g; })();
+  const nR = 260; const mRock = new T.InstancedMesh(rockGeo, new T.MeshLambertMaterial({ vertexColors: true }), nR); mRock.castShadow = true; mRock.frustumCulled = false; scene.add(mRock);
   let rc = 0, rtry = 0; const rockCols = [0x9ea2ad, 0x8b8f9b, 0xaeb2bd, 0x7d8290];
   while (rc < nR && rtry++ < 5000) {
     const mtn = rng() < 0.4; let x, z; if (mtn) { const a = R(0, 6.28), r = R(30, 190); x = G.MT.x + Math.cos(a) * r; z = G.MT.z + Math.sin(a) * r; } else { x = R(-430, 430); z = R(-430, 430); }
@@ -455,17 +475,18 @@ W.build = function (scene) {
   // vehicle spawns along roads
   for (let i = 0; i < roads.length; i++) { const r = roads[i]; for (const t of [0.3, 0.6]) { const x = r[0] + (r[2] - r[0]) * t + R(-3, 3), z = r[1] + (r[3] - r[1]) * t + R(-3, 3); if (heightAt(x, z) > 1.5 && !rects.some(q => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3)) W.vehicleSpawns.push({ x, z, yaw: Math.atan2(-(r[2] - r[0]), -(r[3] - r[1])) }); } }
   // clouds
-  const cg = new T.IcosahedronGeometry(1, 1), cm = new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9fb4c8, transparent: true, opacity: 0.95 }), cmM = new T.Matrix4(), cq = new T.Quaternion(), cs = new T.Vector3(), cp = new T.Vector3();
-  for (let i = 0; i < 26; i++) { const parts = []; const n = 4 + Math.floor(rng() * 4); for (let j = 0; j < n; j++) { const s2 = R(14, 30); cs.set(s2 * 1.4, s2 * 0.6, s2); cp.set(j * 22 - n * 11 + R(-6, 6), R(-4, 4), R(-10, 10)); cmM.compose(cp, cq.identity(), cs); parts.push({ geo: cg, matrix: cmM.clone() }); }
-    const m = new T.Mesh(G.mergeGeoms(parts), cm); m.position.set(R(-900, 900), R(160, 320), R(-900, 900)); scene.add(m); W.clouds.push(m); }
+  const cmat = new T.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.96, emissive: 0x6f87a0, emissiveIntensity: 0.55 });
+  for (let i = 0; i < 18; i++) { const cb = new G.Builder(); const n = 5 + Math.floor(rng() * 4); const base = R(0.97, 1);
+    for (let j = 0; j < n; j++) { const s2 = R(12, 26), px = j * 20 - n * 10 + R(-5, 5), py = R(-2, 5) + (1 - Math.abs(j - n / 2) / (n / 2)) * 8, pz = R(-9, 9); cb.ico(s2, 0xffffff, px, py, pz, 1.35, 0.62, 1, 1); cb.ico(s2 * 0.9, 0xc9d6ea, px, py - s2 * 0.18, pz, 1.4, 0.45, 1.05, 1); }
+    const m = new T.Mesh(cb.geometry(cb.lit), cmat); m.position.set(R(-900, 900), R(170, 330), R(-900, 900)); m.scale.setScalar(R(0.9, 1.4)); scene.add(m); W.clouds.push(m); }
   W.renderMap();
 };
 
 const _fr = new T.Frustum(), _pm = new T.Matrix4();
-/* per-frame frustum + distance culling of the instanced tree chunks */
+W.updateClouds = function (dt) { for (const c of W.clouds) { c.position.x += dt * 3; if (c.position.x > 1100) c.position.x = -1100; } if (W.waterU) W.waterU.time.value += dt; };
+/* per-frame frustum + distance culling of the tree chunks (instanced meshes) */
 W.cullTrees = function (cam, far) { if (!W.treeChunks) return; cam.updateMatrixWorld(); _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); const cx = cam.position.x, cz = cam.position.z;
-  for (const c of W.treeChunks) { const dx = Math.max(c.x0 - cx, 0, cx - (c.x0 + 110)), dz = Math.max(c.z0 - cz, 0, cz - (c.z0 + 110)); const vis = dx * dx + dz * dz < far * far && _fr.intersectsBox(c.box); c.mTrunk.visible = vis; if (c.mP1) { c.mP1.visible = vis; c.mP2.visible = vis; } if (c.mOak) c.mOak.visible = vis; } };
-W.updateClouds = function (dt) { for (const c of W.clouds) { c.position.x += dt * 3; if (c.position.x > 1000) c.position.x = -1000; } if (W.waterTex) { W.waterTex.offset.x += dt * 0.004; W.waterTex.offset.y += dt * 0.002; } };
+  for (const c of W.treeChunks) { const dx = Math.max(c.x0 - cx, 0, cx - (c.x0 + 110)), dz = Math.max(c.z0 - cz, 0, cz - (c.z0 + 110)); const vis = dx * dx + dz * dz < far * far && _fr.intersectsBox(c.box); c.mT.visible = vis; if (c.mP) c.mP.visible = vis; if (c.mO) c.mO.visible = vis; } };
 
 /* ---------------- minimap source image ---------------- */
 W.renderMap = function () {

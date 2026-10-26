@@ -24,14 +24,14 @@ function init() {
   scene.add(new T.HemisphereLight(0xdff1ff, 0x92c96e, 0.62));
   sun = new T.DirectionalLight(0xfff1d0, 0.82); sun.position.set(60, 100, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 1; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6; scene.add(sun); scene.add(sun.target); G.sun = sun;
   // sky
-  sky = new T.Mesh(new T.SphereGeometry(2400, 24, 14), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, fog: false, uniforms: { top: { value: new T.Color(0x2f8cff) }, bot: { value: new T.Color(0xcfe9ff) } },
-    vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader: 'uniform vec3 top; uniform vec3 bot; varying float vY; void main(){ float k = pow(clamp(vY,0.0,1.0),0.55); gl_FragColor = vec4(mix(bot, top, k),1.0);}' }));
+  sky = new T.Mesh(new T.SphereGeometry(2400, 32, 16), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, fog: false, uniforms: { top: { value: new T.Color(0x1f6dff) }, mid: { value: new T.Color(0x59b4ff) }, bot: { value: new T.Color(0xdff3ff) }, sdir: { value: new T.Vector3(0.45, 0.75, 0.3).normalize() } },
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform vec3 sdir; varying vec3 vD; void main(){ float y = clamp(vD.y,0.0,1.0); vec3 c = mix(bot, mid, smoothstep(0.0,0.22,y)); c = mix(c, top, smoothstep(0.18,0.85,y)); float s = max(0.0, dot(normalize(vD), sdir)); c += vec3(1.0,0.88,0.6)*pow(s, 24.0)*0.55 + vec3(1.0,0.95,0.8)*pow(s, 220.0)*1.2; c = mix(c, vec3(0.88,0.95,1.0), smoothstep(0.0, 0.05, 0.05 - abs(vD.y))*0.5); gl_FragColor = vec4(c,1.0);}' }));
   sky.renderOrder = -10; scene.add(sky);
   sunDisc = new T.Mesh(new T.SphereGeometry(70, 12, 8), new T.MeshBasicMaterial({ color: 0xfff6c0, fog: false })); scene.add(sunDisc);
   G.makeBuildMaterials(); G.FX.init(scene); G.World.build(scene);
-  if (!G._rigMerged) { G._rigMerged = true; const mk = G.makeCharacter; G.makeCharacter = function (skin) { return G.mergeRig(mk(skin)); }; }
-  { const GQ = G.Q; GQ.auto = !Q.has('noadapt'); G.shadowsOn = true; const ql = Q.has('q') ? parseInt(Q.get('q'), 10) : (detectTouch() || Math.min(innerWidth, innerHeight) < 600 ? 1 : 2); GQ.apply(isNaN(ql) ? 1 : ql); if (Q.has('q')) GQ.auto = false; }
+  { const GQ = G.Q; GQ.auto = !Q.has('noadapt'); G.shadowsOn = true; const ql = Q.has('q') ? parseInt(Q.get('q'), 10) : (detectTouch() || Math.min(innerWidth, innerHeight) < 600 ? 1 : 2); GQ.max = 2; GQ.apply(isNaN(ql) ? 1 : ql); if (Q.has('q')) GQ.auto = false; }
+  pvInit();
   // bus
   G.bus = { mesh: G.makeBus(), active: false, x: 0, y: 220, z: 0, dx: 1, dz: 0, vx: 0, vz: 0, t: 0 }; scene.add(G.bus.mesh);
   // storm wall
@@ -75,13 +75,41 @@ function updateBus(dt) {
   if (b.active) for (const a of G.actors) if (a.alive && a.state === 'bus') { a.x = b.x; a.y = b.y; a.z = b.z; }
 }
 
+/* ================= lobby character preview (scissored viewport into the main renderer) ================= */
+const PV = { scene: null, cam: null, rig: null, yaw: 0.45, key: '', t: 0, drag: false, spin: 0 };
+function playerSkin() { const U = UI(); const sk = { outfit: U.outfit, tone: U.tone, pick: U.pick }; if (U.skinColor != null) { sk.shirt = U.skinColor; sk.acc = U.skinColor === 0xffd83a ? 0xff5a5a : 0xffffff; } return sk; }
+G.playerSkin = playerSkin;
+function pvInit() {
+  PV.scene = new T.Scene(); PV.cam = new T.PerspectiveCamera(30, 0.7, 0.5, 60);
+  PV.scene.add(new T.HemisphereLight(0xe8f4ff, 0x8fbf6a, 0.95)); const dl = new T.DirectionalLight(0xfff1d0, 0.9); dl.position.set(-3, 6, -4); PV.scene.add(dl); const rl = new T.DirectionalLight(0x9fd4ff, 0.5); rl.position.set(4, 3, 5); PV.scene.add(rl);
+  const pad = new T.Mesh(new T.CylinderGeometry(1.15, 1.25, 0.12, 28), new T.MeshLambertMaterial({ color: 0x3a4f7a })); pad.position.y = -0.06; PV.scene.add(pad);
+  const ring = new T.Mesh(new T.TorusGeometry(1.18, 0.035, 6, 40), new T.MeshBasicMaterial({ color: 0xffd83a })); ring.rotation.x = Math.PI / 2; PV.scene.add(ring);
+  const el = $('previewBox'); const dn = e => { PV.drag = e.pointerId; PV.lx = e.clientX; try { el.setPointerCapture(e.pointerId); } catch (_) { } e.stopPropagation(); };
+  el.addEventListener('pointerdown', dn); el.addEventListener('pointermove', e => { if (PV.drag === e.pointerId) { PV.yaw += (e.clientX - PV.lx) * 0.012; PV.lx = e.clientX; PV.spin = 6; } });
+  const up = e => { if (PV.drag === e.pointerId) PV.drag = false; }; el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  G.pvRefresh = pvRefresh;
+}
+function pvRefresh() {
+  const sk = playerSkin(), U = UI(), key = [sk.outfit, sk.tone, sk.shirt, sk.acc, sk.pick].join('|'); if (key === PV.key || !PV.scene) return; PV.key = key;
+  if (PV.rig) PV.scene.remove(PV.rig.root); PV.rig = G.makeCharacter(sk); PV.rig.setHeld('pickaxe'); PV.rig.setLOD(0); PV.scene.add(PV.rig.root);
+}
+function pvRender(dt) {
+  const el = $('previewBox'); if (!el || !PV.scene) return; const r = el.getBoundingClientRect(); if (r.width < 40 || r.height < 60) return; pvRefresh(); if (!PV.rig) return;
+  PV.t += dt; PV.spin = Math.max(0, PV.spin - dt); if (!PV.drag && PV.spin <= 0) PV.yaw += (0.45 - PV.yaw) * Math.min(1, dt * 0.6);
+  const rg = PV.rig, t = PV.t, ph = t * 1.6; rg.root.rotation.y = PV.yaw; rg.m.position.y = -1 + Math.sin(ph) * 0.012; rg.lean.rotation.x = Math.sin(ph) * 0.012;
+  const wv = (t % 9) > 6.5; rg.arms[0].rotation.set(0.05 + Math.sin(ph) * 0.03, 0, 0.05); rg.elbows[0].rotation.x = 0.2; rg.arms[1].rotation.set(0.5, 0, -0.1); rg.elbows[1].rotation.x = 0.6; rg.legs[0].rotation.x = 0; rg.legs[1].rotation.x = 0; rg.knees[0].rotation.x = rg.knees[1].rotation.x = 0; rg.head.rotation.set(0, Math.sin(t * 0.7) * 0.2, 0);
+  if (wv) { rg.arms[0].rotation.set(0, 0, 2.7 + Math.sin(t * 11) * 0.2); rg.elbows[0].rotation.x = 0.3; }
+  const asp = r.width / r.height, c = PV.cam, dist = Math.max(5.9, 1.05 / (Math.tan(15 * Math.PI / 180) * asp)); c.aspect = asp; c.updateProjectionMatrix(); c.position.set(0, 1.5, -dist); c.lookAt(0, 1.08, 0);
+  const rd = renderer, bottom = innerHeight - r.bottom; rd.setScissorTest(true); rd.setViewport(r.left, bottom, r.width, r.height); rd.setScissor(r.left, bottom, r.width, r.height); rd.autoClear = false; rd.clearDepth(); rd.render(PV.scene, c); rd.autoClear = true; rd.setScissorTest(false); rd.setViewport(0, 0, innerWidth, innerHeight);
+}
+
 /* ================= match flow ================= */
 function startMatch() {
   if (state.phase === 'playing') return; G.Audio.init(); G.Audio.stopMusic();
   const name = ($('nameInput').value || 'Player').trim().slice(0, 14) || 'Player'; localStorage.setItem('sf_name', name);
-  const pc = UI().skinColor; const skin = { shirt: pc, pants: 0x2b3a55, acc: pc === 0xffd83a ? 0xff5a5a : 0xffd83a, hat: 'cap', tone: 0xf2c9a0, pick: UI().pick };
+  const skin = playerSkin();
   G.time = 0; G._xpDone = false; G.Extras.llamaT = 45; G.Extras.llamaN = 0; const pl = G.player = G.createActor(name, true, skin); pl.stats.born = 0; G.view = pl;
-  startBus(); G.spawnBots(34); initStorm(); G.spawnVehicles();
+  G.Audio.ambientStart(); startBus(); G.spawnBots(34); initStorm(); G.spawnVehicles();
   $('lobby').classList.add('hidden'); $('hud').classList.remove('hidden'); $('busHint').style.display = 'block'; state.phase = 'playing'; state.ended = false; state.spec = null; state.matchOver = false; state.paused = false;
   if (!NOLOCK) lock();
   $('lobbyInfo').textContent = '';
@@ -214,7 +242,7 @@ function initMapInput() {
 /* lobby: drag the island view to orbit it (horizontal = rotate, vertical = raise/lower camera) */
 function initLobbyDrag() {
   const lob = $('lobby'); let pid = null, lx = 0, ly = 0;
-  lob.addEventListener('pointerdown', e => { if (state.phase !== 'lobby' || pid !== null || (e.pointerType === 'mouse' && e.button !== 0)) return; if (e.target.closest('input,button,label,.sw,.pk,#lvlBox,.lookset,select')) return; pid = e.pointerId; lx = e.clientX; ly = e.clientY; try { lob.setPointerCapture(pid); } catch (_) { } });
+  lob.addEventListener('pointerdown', e => { if (state.phase !== 'lobby' || pid !== null || (e.pointerType === 'mouse' && e.button !== 0)) return; if (e.target.closest('input,button,label,.sw,.pk,.of,.tn,#lvlBox,.lookset,select,#previewBox')) return; pid = e.pointerId; lx = e.clientX; ly = e.clientY; try { lob.setPointerCapture(pid); } catch (_) { } });
   lob.addEventListener('pointermove', e => { if (e.pointerId !== pid) return; lobbyYaw -= (e.clientX - lx) * 0.006 * LS.sens; lobbyElev = G.clamp(lobbyElev + (e.clientY - ly) * 0.004 * LS.sens * (LS.invertY ? -1 : 1), -0.55, 1); lx = e.clientX; ly = e.clientY; });
   const end = e => { if (e.pointerId === pid) pid = null; };
   lob.addEventListener('pointerup', end); lob.addEventListener('pointercancel', end); lob.addEventListener('lostpointercapture', end);
@@ -355,12 +383,10 @@ function updateLootViz(dt) {
   }
   const t = G.time; for (const v of lootViz) if (v.cur) { if (v.cur.taken) { v.cur = null; v.g.visible = false; continue; } v.beam.visible = (v.cur.x - camera.position.x) ** 2 + (v.cur.z - camera.position.z) ** 2 > 36; v.holder.rotation.y = t * 1.6; v.holder.position.y = 0.75 + Math.sin(t * 2.5 + v.cur.id) * 0.12; }
 }
-/* distant characters stop casting shadows (halves their draw calls: every caster is drawn again in the shadow pass) */
-function rigShadow(r, on) { if (r._sh === on) return; r._sh = on; if (!r._ms) { r._ms = []; r.root.traverse(o => { if (o.isMesh && o.castShadow) r._ms.push(o); }); } for (const m of r._ms) m.castShadow = on; }
 function updateCull(dt) {
   cullT -= dt; if (cullT > 0) return; cullT = 0.3; const cx = camera.position.x, cz = camera.position.z;
   for (const c of G.chests) { const d = Math.hypot(c.x - cx, c.z - cz); c.grp.visible = !c.gone && d < 380; c.mesh.visible = c.lid.visible = d < 130; }
-  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < G.actorFar && !(a.hidden && d > 9); rigShadow(a.rig, d < G.shadowActorDist); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
+  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < G.cullFar * 0.6 && !(a.hidden && d > 9); a.rig.setLOD(d < G.outlineDist ? 0 : d < [26, 36, 48][G.Q.level] ? 1 : 2); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
 }
 
 /* ================= camera ================= */
@@ -457,9 +483,9 @@ G.simStep = simStep;
 function frame(ts) {
   requestAnimationFrame(frame); const rawDt = (ts - lastT) / 1000 || 0.016, dt = Math.min(0.05, rawDt); lastT = ts; if (rawDt < 0.5) G.Q.tick(rawDt);
   if (state.phase === 'loading') return;
-  if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); G.World.cullTrees(camera, 1500); renderer.render(scene, camera); return; }
+  if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); G.World.cullTrees(camera, 1500); renderer.render(scene, camera); pvRender(dt); return; }
   if (!state.paused && !state.helpOpen) simStep(dt);
-  updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt); G.World.cullTrees(camera, G.cullFar);
+  { const vw = G.view || G.player; G.Audio.ambTick(dt, vw.y, vw.speedNow || 0); } updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt); G.World.cullTrees(camera, G.cullFar);
   uiT -= dt; G.UI.update(dt); if (G.touchOn) touchUpdate(); G.UI.drawMini(); if (state.mapOpen) G.UI.drawBig();
   renderer.render(scene, camera);
 }
@@ -478,11 +504,12 @@ G.debug = {
 };
 
 /* ================= boot ================= */
-setTimeout(() => {
+const boot = () => {
   try { init(); } catch (e) { $('loadMsg').textContent = 'Failed to start: ' + e.message; console.error(e); throw e; }
   $('loading').style.display = 'none'; state.phase = 'lobby'; G.Audio.lobbyMusic && 0; 
   $('lobbyInfo').innerHTML = 'Island: ' + G.POIS.length + ' named locations • ' + G.World.buildings.length + ' buildings • ' + G.chests.length + ' chests & supply trucks • ' + G.Extras.bushes.length + ' bushes • ' + G.Extras.camps.length + ' campfires • ' + G.Extras.rifts.length + ' rifts<br>35 players • 34 AI bots • storm shrinks in 6 phases<br>Three.js (bundled locally) — all art generated procedurally';
   requestAnimationFrame(frame);
   if (Q.has('autostart') || sessionStorage.getItem('sf_auto')) { sessionStorage.removeItem('sf_auto'); setTimeout(() => startMatch(), 200); }
-}, 60);
+};
+setTimeout(() => { const lm = $('loadMsg'); if (lm && G.Assets && G.Assets.enabled) lm.textContent = 'Loading models…'; (G.Assets ? G.Assets.load() : Promise.resolve()).then(boot, boot); }, 60);
 })();

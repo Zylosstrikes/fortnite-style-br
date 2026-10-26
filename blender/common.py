@@ -23,6 +23,8 @@ def reset():
     MATS.clear()
 
 MATS = {}
+BEVEL_MIN = 0.05   # boxes thinner than this stay sharp (keeps triangle counts phone-friendly)
+BEVEL = 0.012   # metres: soft chunky edge on every box primitive
 # role materials: the game recolours these by name (outfit colours, rarity glow, glider tint ...)
 ROLE_DEFAULT = {'skin': 0xf2c9a0, 'top': 0x3f9a4a, 'top2': 0xf0e2a6, 'pants': 0x8a6a3a, 'boots': 0x5a3a22, 'glove': 0x5a3a22, 'hair': 0x6a4026,
                 'hat': 0x3f9a4a, 'pack': 0x7a6a30, 'rarity': 0xc0c0c0, 'tint': 0xff5a5a}
@@ -72,7 +74,7 @@ class Builder:
     def _add(self, kind, col, glow, m, smooth=False, a=0, b=0, c=0):
         self.parts.append(Part(kind, col, glow, m, smooth, a, b, c)); return self
     def box(self, w, h, d, col, x=0, y=0, z=0, rx=0, ry=0, rz=0, glow=False):
-        return self._add('box', col, glow, trs(x, y, z, w, h, d, rx, ry, rz))
+        return self._add('box', col, glow, trs(x, y, z, w, h, d, rx, ry, rz), False, 0, 0, min(w, h, d))
     def cyl(self, r, length, col, x=0, y=0, z=0, axis='y', r2=None, seg=8, glow=False):
         rx = rz = 0
         if axis == 'z': rx = math.pi / 2
@@ -110,17 +112,24 @@ class Builder:
                     bmesh.ops.create_icosphere(bmp, subdivisions=int(p.a) + 1 if p.a else 1, radius=1.0)
                 elif p.kind == 'torus':
                     ring = 6; segs = 16
+                    # torus axis = game +Z (== local Blender -Y); arc runs from +X towards game +Y like three's TorusGeometry
                     bmesh.ops.create_circle(bmp, cap_ends=False, radius=p.b, segments=ring)
-                    bmesh.ops.rotate(bmp, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, 'X'), verts=bmp.verts)
                     bmesh.ops.translate(bmp, vec=(p.a, 0, 0), verts=bmp.verts)
-                    bmesh.ops.spin(bmp, geom=bmp.verts[:] + bmp.edges[:], cent=(0, 0, 0), axis=(0, 0, 1), angle=p.c, steps=segs)
+                    bmesh.ops.spin(bmp, geom=bmp.verts[:] + bmp.edges[:], cent=(0, 0, 0), axis=(0, 1, 0), angle=-p.c, steps=segs)
+                bmp.normal_update()
+                if p.kind in ('cyl', 'cone'):   # smooth sides, crisp cap edges
+                    for f in bmp.faces:
+                        if abs(f.normal.z) < 0.7: f.smooth = True
+                    for e in bmp.edges:
+                        if len(e.link_faces) == 2 and (abs(e.link_faces[0].normal.z) >= 0.7) != (abs(e.link_faces[1].normal.z) >= 0.7): e.smooth = False
                 bmesh.ops.transform(bmp, matrix=p.m, verts=bmp.verts)
+                if p.kind == 'box' and BEVEL > 0 and p.c > BEVEL_MIN:
+                    w = min(BEVEL, p.c * 0.14)
+                    bmesh.ops.bevel(bmp, geom=bmp.edges[:], offset=w, segments=1, affect='EDGES', profile=0.5)
                 if p.smooth:
                     for f in bmp.faces: f.smooth = True
                 mesh_tmp = bpy.data.meshes.new('tmp'); bmp.to_mesh(mesh_tmp); bmp.free(); bm.from_mesh(mesh_tmp); bpy.data.meshes.remove(mesh_tmp)
             bmesh.ops.translate(bm, vec=-piv, verts=bm.verts)
-            bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.00001)
-            bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
             me = bpy.data.meshes.new(name + '_' + (col if isinstance(col, str) else '%06x' % col))
             bm.to_mesh(me); bm.free()
             me.materials.append(material(col, glow))

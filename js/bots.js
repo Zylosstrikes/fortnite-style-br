@@ -167,7 +167,7 @@ function tryBuild(a, type) { if (a.placeCD > 0) return false; const sp = G.Build
 G.spawnBots = function (n) {
   const names = G.BOT_NAMES.slice().sort(() => Math.random() - 0.5); const hats = ['cap', 'helmet', 'mohawk', 'horns', 'beanie', 'band'];
   for (let i = 0; i < n; i++) {
-    const cols = G.SKIN_COLORS; const skin = { shirt: G.pick(cols), pants: G.pick([0x2b3a55, 0x3a2b55, 0x2b5540, 0x554a2b, 0x40414a]), acc: G.pick(cols), hat: G.pick(hats), tone: G.pick([0xf2c9a0, 0xd9a577, 0xa87650, 0x7b5236, 0xffe0c4]), pick: G.pick(G.PICKAXES).id };
+    const skin = G.randomSkin();
     const a = G.createActor(names[i % names.length], false, skin); a.stats.born = 0; G.AI.init(a, G.bus, G.POIS); a.rig.root.visible = false;
   }
 };

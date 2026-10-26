@@ -20,7 +20,11 @@
     <div class="tag">35-player 3D battle royale • original procedural art • runs offline</div>
     <label class="lbl">PLAYER NAME</label>
     <input id="nameInput" maxlength="14" value="Player" spellcheck="false" autocomplete="off">
-    <label class="lbl">OUTFIT COLOR</label>
+    <label class="lbl">OUTFIT</label>
+    <div id="outfitRow"></div>
+    <label class="lbl">SKIN TONE</label>
+    <div id="toneRow"></div>
+    <label class="lbl">TINT (OPTIONAL)</label>
     <div id="swatches"></div>
     <label class="lbl">PICKAXE</label>
     <div id="pickRow"></div>
@@ -33,7 +37,7 @@
     <button id="helpBtn" class="smallbtn">CONTROLS (H)</button>
     <div class="hint">Click PLAY, then click the game to capture the mouse (if the browser blocks that, just click &amp; drag to look). Drag on the island view to rotate it. Press <b>H</b> anytime for controls.</div>
   </div>
-  <div class="lobby-right"><div id="lobbyInfo"></div></div>
+  <div class="lobby-right"><div id="previewBox"><span id="previewHint">DRAG TO TURN</span></div><div id="lobbyInfo"></div></div>
 </div>
 
 <!-- HUD -->
@@ -103,10 +107,13 @@
 <script src="lib/three.min.js"></script>
 <script src="js/util.js"></script>
 <script src="js/data.js"></script>
-<script src="js/perf.js"></script>
+<script src="js/gfx.js"></script>
+<script src="lib/GLTFLoader.js"></script>
 <script src="js/world.js"></script>
 <script src="js/models.js"></script>
 <script src="js/models2.js"></script>
+<script src="js/models3.js"></script>
+<script src="js/assets.js"></script>
 <script src="js/actors.js"></script>
 <script src="js/bots.js"></script>
 <script src="js/features.js"></script>

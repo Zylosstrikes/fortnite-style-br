@@ -3,13 +3,17 @@
 <meta charset="utf-8"><link rel="icon" href="data:,"><title>Stormfall Royale — Model Gallery</title>
 <style>html,body{margin:0;height:100%;background:#16213a;color:#fff;font:12px 'Trebuchet MS',Arial,sans-serif;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%}
 .l{position:fixed;transform:translate(-50%,0);text-align:center;text-shadow:0 1px 2px #000;pointer-events:none;font-weight:bold;white-space:nowrap}h1{position:fixed;left:14px;top:6px;margin:0;font-size:16px;letter-spacing:2px;color:#ffe36a}</style></head>
-<body><canvas id="c"></canvas><h1>STORMFALL ROYALE — PROCEDURAL MODEL GALLERY (all original, generated in code)</h1>
-<script src="lib/three.min.js"></script><script src="js/util.js"></script><script src="js/data.js"></script><script src="js/models.js"></script><script src="js/models2.js"></script>
+<body><canvas id="c"></canvas><h1>STORMFALL ROYALE — MODEL GALLERY — glTF built in Blender (add ?noassets for the procedural fallback)</h1>
+<script src="lib/three.min.js"></script><script src="js/util.js"></script><script src="js/data.js"></script><script src="js/gfx.js"></script><script src="js/models.js"></script><script src="js/models2.js"></script><script src="js/models3.js"></script><script src="lib/GLTFLoader.js"></script><script src="js/assets.js"></script>
 <script>
-const G = window.G, T = THREE; const Q = new URLSearchParams(location.search); const rot = Q.has('static') ? 0 : 1;
+(async () => { await window.G.Assets.load(); const G = window.G, T = THREE; const Q = new URLSearchParams(location.search); const rot = Q.has('static') ? 0 : 1;
 const renderer = new T.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); renderer.setPixelRatio(1);
 const scene = new T.Scene(); scene.background = new T.Color(0x24324f); scene.add(new T.HemisphereLight(0xffffff, 0x8899aa, 0.9)); const dl = new T.DirectionalLight(0xffffff, 0.9); dl.position.set(5, 8, 6); scene.add(dl);
+const chr = i => () => { const r = G.makeCharacter({ outfit: i, tone: G.SKIN_TONES[i % 6], pick: G.PICKAXES[i % G.PICKAXES.length].id }); r.setHeld('pickaxe'); return r.root; };
 const rows = [
+  ['Outfits', G.OUTFITS.slice(0, 6).map((o, i) => [o.name, chr(i), 2.2, 0.5])],
+  ['Outfits 2', G.OUTFITS.slice(6).map((o, i) => [o.name, chr(i + 6), 2.2, 0.5])],
+  ['Glider & Battle Bus', [['Umbrella Glider', () => G.makeGlider(0xff5a5a), 4, -0.4], ['Umbrella Glider', () => G.makeGlider(0x3fa0ff), 4, 0.3], ['Battle Bus + balloon', () => G.makeBus(), 9, -0.5]]],
   ['Weapons (Epic)', ['pistol', 'dual', 'shotgun', 'ar', 'smg', 'sniper', 'rocket'].map(w => [G.WEAPONS[w].name, () => G.weaponModel(w, G.RARITY[3].hex), 2.2, 1.35])],
   ['Pickaxes', G.PICKAXES.map(p => [p.name, () => G.pickaxeModel(p.id), 1.9, 0.6])],
   ['Healing & gadgets', [['chug', 'Chug Jug'], ['shield', 'Shield Potion'], ['minishield', 'Small Shield Potion'], ['slurp', 'Slurp Bottle'], ['medkit', 'Med Kit']].map(([id, n]) => [n, () => G.makeHealModel(id), 1.2, -0.5]).concat([['Dynamite', () => G.gadgetModel('tnt'), 1.0, -0.4], ['Launch Pad', () => G.makeTrapMesh('launchpad'), 3.2, -0.4], ['Spike Trap', () => G.makeTrapMesh('spike'), 3.0, -0.4]])],
@@ -21,10 +25,11 @@ function layout() {
 }
 rows.forEach((row, ri) => { row[1].forEach((it, ci) => { const m = it[1](); m.traverse(o => { if (o.userData && o.userData.beam && o.userData.beam.parent) o.userData.beam.parent.remove(o.userData.beam); }); const holder = new T.Group(); const box = new T.Box3().setFromObject(m); const c = box.getCenter(new T.Vector3()); const sz = box.getSize(new T.Vector3()); const s = (it[2] > 0 ? 2.0 / Math.max(sz.x, sz.y, sz.z) : 1);
   m.position.sub(c); const inner = new T.Group(); inner.add(m); inner.scale.setScalar(s); inner.rotation.x = 0.2; holder.add(inner); holder.userData = { inner, base: it[3] }; inner.rotation.y = it[3];
-  const n = row[1].length; holder.position.set((ci - (n - 1) / 2) * 2.7, (1.5 - ri) * 2.9, 0); scene.add(holder); items.push(holder);
+  const n = row[1].length; holder.position.set((ci - (n - 1) / 2) * 2.7, ((rows.length - 1) / 2 - ri) * 2.9, 0); scene.add(holder); items.push(holder);
   const l = document.createElement('div'); l.className = 'l'; l.textContent = it[0]; document.body.appendChild(l); labels.push([l, holder]); }); });
 cam.position.set(0, 0, 20); layout(); addEventListener('resize', layout);
-function frame(t) { requestAnimationFrame(frame); layout(); const sy = Math.min(1, innerHeight / 760); cam.position.z = Math.max(21.6, 13.8 / (Math.tan(cam.fov * Math.PI / 360) * cam.aspect)); items.forEach(h => { if (rot) h.userData.inner.rotation.y = h.userData.base + Math.sin(t / 1200) * 0.5; });
+function frame(t) { requestAnimationFrame(frame); layout(); const sy = Math.min(1, innerHeight / 760); cam.position.z = Math.max(21.6, 13.8 / (Math.tan(cam.fov * Math.PI / 360) * cam.aspect)) * rows.length / 4; items.forEach(h => { if (rot) h.userData.inner.rotation.y = h.userData.base + Math.sin(t / 1200) * 0.5; });
   renderer.render(scene, cam); labels.forEach(([l, h]) => { const v = h.position.clone(); v.y -= 1.25; v.project(cam); l.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; l.style.top = ((1 - v.y) / 2 * innerHeight) + 'px'; }); }
 requestAnimationFrame(frame);
+})();
 </script></body></html>

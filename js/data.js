@@ -12,7 +12,7 @@ G.CHEST_RARITY_W = [8, 30, 36, 20, 6];
 G.WEAPONS = {
   pistol:  { name: 'Peacemaker Pistol', short: 'Pistol', ammo: 'light', dmg: 24, rate: 6.5, mag: 16, reload: 1.6, spread: 0.010, range: 120, pellets: 1, auto: false, hs: 2.0, w: 13, bots: 20 },
   dual:    { name: 'Twin Gold-Grip Pistols', short: 'Duals', ammo: 'light', dmg: 20, rate: 9, mag: 24, reload: 2.1, spread: 0.018, range: 100, pellets: 1, auto: false, hs: 1.9, w: 8, bots: 21 },
-  shotgun: { name: 'Double-Barrel Shotgun', short: 'D-Barrel', ammo: 'shells', dmg: 15, rate: 1.25, mag: 2, reload: 2.1, spread: 0.07, range: 45, pellets: 10, auto: false, hs: 1.6, w: 15, bots: 11 },
+  shotgun: { name: 'Pump Shotgun', short: 'Pump', ammo: 'shells', dmg: 13, rate: 1.0, mag: 5, reload: 3.0, spread: 0.07, range: 45, pellets: 10, auto: false, hs: 1.6, w: 15, bots: 11 },
   ar:      { name: 'Dune Scar Rifle', short: 'SCAR', ammo: 'medium', dmg: 30, rate: 5.5, mag: 30, reload: 2.3, spread: 0.014, range: 170, pellets: 1, auto: true, hs: 1.6, w: 18, bots: 28 },
   smg:     { name: 'Micro SMG', short: 'Micro', ammo: 'light', dmg: 16, rate: 12, mag: 30, reload: 1.9, spread: 0.030, range: 95, pellets: 1, auto: true, hs: 1.5, w: 16, bots: 20 },
   sniper:  { name: 'Longshot Sniper', short: 'Sniper', ammo: 'heavy', dmg: 95, rate: 0.6, mag: 1, reload: 2.6, spread: 0.0012, range: 420, pellets: 1, auto: false, hs: 2.4, zoom: 18, w: 8, bots: 8 },

@@ -22,7 +22,7 @@ G.fbm = function (x, z, oct) { let s = 0, a = 0.5, f = 1, n = 0; for (let i = 0;
 
 /* ---------- Audio (WebAudio beeps + noise) ---------- */
 G.Audio = (function () {
-  let ctx = null, master = null, noiseBuf = null, muted = false, voices = 0, engine = null;
+  let ctx = null, master = null, noiseBuf = null, muted = false, voices = 0, engine = null, amb = null;
   const L = { x: 0, y: 0, z: 0, yaw: 0 };
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -84,9 +84,13 @@ G.Audio = (function () {
     kill: (v) => { tone(880, 0.1, 'square', 0.2 * v); tone(1320, 0.18, 'square', 0.2 * v, 0, 0.09); },
     bus: (v) => { tone(180, 0.35, 'sawtooth', 0.2 * v, 0); tone(240, 0.5, 'sawtooth', 0.2 * v, 0, 0.35); },
     crash: (v, p) => { noise(0.3, 0.7 * v, 600, 'lowpass', p, 0, 120); },
-    step: (v, p) => noise(0.05, 0.12 * v, 700, 'lowpass', p),
+    step: (v, p) => { noise(0.07, 0.13 * v, 520 + Math.random() * 200, 'lowpass', p); },
+    steps: (v, p) => { noise(0.09, 0.11 * v, 3200, 'highpass', p, 0, 6000); },
+    stepb: (v, p) => { noise(0.05, 0.16 * v, 1400 + Math.random() * 400, 'bandpass', p); tone(150 + Math.random() * 30, 0.04, 'square', 0.05 * v, 90, 0, p); },
+    chirp: (v, p) => { const f = 2400 + Math.random() * 1400; tone(f, 0.06, 'sine', 0.05 * v, f * 1.5, 0, p); tone(f * 1.1, 0.07, 'sine', 0.05 * v, f * 0.8, 0.09, p); if (Math.random() < 0.6) tone(f * 1.25, 0.06, 'sine', 0.04 * v, f * 1.6, 0.2, p); },
+    whoosh: (v) => noise(0.35, 0.25 * v, 500, 'bandpass', 0, 0, 2200),
   };
-  const maxD = { dual: 120, shotgun: 160, sniper: 300, rocket: 220, explosion: 300, ar: 180, smg: 140, pistol: 120, reload: 30, build: 60, harvest: 50, break: 90, emote: 40, crash: 80, step: 25, chest: 40, splash: 40 };
+  const maxD = { dual: 120, shotgun: 160, sniper: 300, rocket: 220, explosion: 300, ar: 180, smg: 140, pistol: 120, reload: 30, build: 60, harvest: 50, break: 90, emote: 40, crash: 80, step: 25, steps: 25, stepb: 25, chest: 40, splash: 40 };
   return {
     L, init, tone, noise, get ctx() { return ctx; },
     play(name, vol, pan) { if (!ctx || muted) return; const f = S[name]; if (f) f(vol === undefined ? 1 : vol, pan || 0); },
@@ -108,7 +112,17 @@ G.Audio = (function () {
       if (!ctx) return; const notes = [262, 330, 392, 330, 294, 370, 440, 370]; let i = 0;
       G._music = setInterval(() => { if (muted) return; tone(notes[i % 8], 0.4, 'triangle', 0.07, 0); if (i % 4 === 0) tone(notes[i % 8] / 2, 0.8, 'sine', 0.08); i++; }, 380);
     },
-    stopMusic() { clearInterval(G._music); }
+    stopMusic() { clearInterval(G._music); },
+    /* ambience: looping filtered wind (louder when high / fast) + occasional birds near the ground */
+    ambientStart() {
+      if (!ctx || amb) return; const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; const g = ctx.createGain(); g.gain.value = 0.0;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11; const lg = ctx.createGain(); lg.gain.value = 140; lfo.connect(lg); lg.connect(f.frequency); s.connect(f); f.connect(g); g.connect(master); s.start(); lfo.start(); amb = { s, g, f, lfo, t: 3, base: 0.03 };
+    },
+    ambientStop() { if (amb) { try { amb.s.stop(); amb.lfo.stop(); } catch (e) { } amb = null; } },
+    ambTick(dt, alt, speed) {
+      if (!amb) return; const w = 0.025 + Math.min(0.2, Math.max(0, (alt - 20) * 0.0007) + speed * 0.0035); amb.g.gain.value += (w - amb.g.gain.value) * Math.min(1, dt * 2); amb.f.frequency.value = 380 + speed * 14 + Math.max(0, alt) * 0.5;
+      amb.t -= dt; if (amb.t <= 0) { amb.t = 3 + Math.random() * 7; if (alt < 40 && !muted) S.chirp(0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 1.6); }
+    }
   };
 })();
 })();

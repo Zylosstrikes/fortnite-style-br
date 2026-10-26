@@ -10,7 +10,7 @@ Run locally: `python3 -m http.server 8000` then open http://localhost:8000
 ## What's in the game
 - 35-actor match: bus drop, glider, building, storm, bots with sense/aim/loot AI, Victory screen.
 - **Healing:** Bandage, Medkit (red case, white cross), Small Shield Potion, Shield Potion, Slurp Bottle, **Chug Jug** (full health + shield, long use time).
-- **Weapons:** Peacemaker Pistol, Twin Gold-Grip Pistols (dual wield), Double-Barrel Shotgun, Dune Scar Rifle, Micro SMG, Longshot Sniper, Orange Boom Cannon (rockets). Rarity tiers colour the beams, hotbar and names.
+- **Weapons:** Peacemaker Pistol, Twin Gold-Grip Pistols (dual wield), Pump Shotgun, Dune Scar Rifle, Micro SMG, Longshot Sniper, Orange Boom Cannon (rockets). Rarity tiers colour the beams, hotbar and names.
 - **Chests:** wooden gold-trim chests (common to epic loot) and blue metal chests (epic to legendary loot). Rarity shown by beam colour and gem; the prompt names the rarity.
 - **Bushes:** press E (or just walk in) to hide. Bushes go translucent for you; bots lose sight of hidden targets beyond a few metres unless you fire.
 - **Supply Llama:** a balloon pinata drops from the sky into the safe zone roughly every minute with a big loot pile (marked on the map).
@@ -23,6 +23,14 @@ Run locally: `python3 -m http.server 8000` then open http://localhost:8000
 - **Pickaxe cosmetics (lobby):** Classic Pickaxe, Battle Axe, Digger Shovel, Reaper Sickle, Smash Hammer. Stored in localStorage.
 - **XP and levels:** after each match you earn XP (survival time, eliminations, placement, win bonus), see a progress bar and a level-up badge. Stored in localStorage (`sf_xp`, `sf_pick`). XP is not a currency; the game has no currency or purchases.
 
+## v2 art & performance pass
+- **Characters:** stylised big-head humanoids built from merged primitives with a real skeleton (hips, knees, shoulders, elbows, head look). 12 outfits (Trail Ranger, Neon Drifter, Frost Guard, Gold Rush, Shadow Op, Beach Bro, Tin Knight, Circuit Pal, Dino Hoodie, Dusty Cowpoke, Lab Rat, Pixel Punk) with helmets/caps/hoods/hats, hair styles, glasses/visors, masks and backpacks; 6 skin tones plus an optional tint. Every bot gets a random outfit, hue shift, skin tone and hair colour.
+- **Lobby preview:** your character is rendered live in the lobby (drag it to turn it) with an outfit / skin-tone / tint / pickaxe picker (saved in localStorage).
+- **Gear:** umbrella glider (coloured to your outfit), blue Battle Bus slung under a striped hot-air balloon, pump shotgun / tactical SMG / modern AR / scoped sniper / shoulder rocket launcher / pistols, five pickaxes. All rarity-tinted.
+- **World:** toon (stepped) shading with a rim light and inverted-hull outlines, gradient sky with sun glow, fluffy merged clouds, animated depth-tinted water with shore foam, layered pines / blobby oaks / faceted rocks, brick-wood-metal building textures.
+- **FX / audio:** star-shaped muzzle flash, tracers, hit sparks, explosions with shockwave ring, fireball, embers and smoke; surface-aware footsteps (grass / sand / building), wind and birdsong ambience.
+- **Performance:** terrain split into frustum-culled chunks, chunked + culled instanced trees, merged cloud meshes, character LOD (articulated + outline -> articulated -> single merged mesh -> hidden), adaptive quality manager (pixel ratio, shadows, fog and cull distance; auto-adjusts to the frame time on phones). URL options: `?q=0|1|2` fixes the quality level, `?noadapt` disables auto-adjust.
+
 ## HUD & touch controls (v3 layout)
 - **Desktop:** minimap top-left, storm timer top-centre, alive/elims + kill feed top-right, shield/health + hotbar bottom-centre with a one-line key-hint strip, materials bottom-left, ammo bottom-right. Touch controls are hidden.
 - **Touch (auto-detected, or add `?touch`):** left joystick (push to the edge to sprint) + drag anywhere on the right to look. Right-hand action cluster: big FIRE (drag the finger to aim while firing), AIM (toggle), JUMP, SPRINT (toggle), RELOAD, BUILD, EMOTE. One BUILD button opens a grouped build panel (wall / floor / ramp / roof, material cycle, edit) above the stick. EMOTE opens a 4-way wheel. USE (chest / loot / vehicle / bush), DROP (bus) and GLIDE (free-fall) only appear when relevant. Top-right menu cluster: map, pause, sound, help; tapping the minimap opens the map.
@@ -31,9 +39,17 @@ Run locally: `python3 -m http.server 8000` then open http://localhost:8000
 
 ## Code layout
 - `js/data.js` weapons, heals, gadgets, pickaxes, XP helpers
-- `js/models.js`, `js/models2.js` procedural models and icon renderer
+- `js/gfx.js` toon/rim shading, geometry builder + merger, outline material, quality manager
+- `js/models.js`, `js/models2.js` procedural models and icon renderer; `js/models3.js` characters / outfits, glider, bus, weapons, pickaxes
 - `js/world.js` terrain, buildings, chests, loot; `js/features.js` bushes, trucks, llama, traps, rifts, campfires, crown, XP
 - `js/actors.js`, `js/bots.js`, `js/ui.js`, `js/main.js`, `js/util.js`
 - `gallery.html` turntable-free gallery of every model (add `?static` for a still render)
 
 All art is original; nothing is copied from any other game's assets.
+
+
+## Round 3 — Blender models + performance
+* **Models are now real glTF files built in Blender** (`blender/` scripts → `assets/models/*.glb`, ~2.3 MB total, 20 files): 12 outfit characters, 7 weapons + 5 pickaxes, umbrella glider, battle bus with a gored hot-air balloon, wood/metal chests, healing pickups, supply llama and trees. Bevelled edges + smooth shading come from Blender; the game bakes them to a few draw calls and recolours role materials (outfit colours, rarity glow, glider tint).
+* **Automatic fallback**: `js/assets.js` wraps every model factory — if a `.glb` is missing or fails, the original procedural model is used (`?noassets` forces it). Drop in your own Blender models: see `assets/models/README.md`.
+* **Performance**: chunked terrain, culled instanced tree chunks, merged clouds, merged character rigs with LOD, adaptive quality manager (pixel ratio / shadows / draw distance), distant shadow casters off.
+* Rebuild the models: `python3 blender/tools/dump_specs.py` (needs the game running locally) then `blender -b --python blender/build_all.py -- assets/models`.

@@ -299,3 +299,18 @@ body.land #emoteWheel .ring{transform:scale(.88)}
 .lobby-right{touch-action:none;cursor:grab}
 #pause .panel{max-height:94vh;overflow-y:auto;touch-action:pan-y}
 @media (max-height:520px){#pause .bigbtn{margin-top:2px;font-size:28px;padding:4px 28px}#pause .panel{gap:6px}.lookset{gap:3px}.lsrow input[type=range]{height:20px}.mapctl{margin-top:4px}.mapctl .smallbtn{min-height:32px;padding:4px 12px}}
+
+/* ---- v2: outfit picker + lobby character preview ---- */
+#outfitRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.of{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.3px;transform:skew(-4deg);touch-action:manipulation}
+.of i{width:20px;height:20px;border-radius:5px;border:2px solid #fff;flex:none}
+.of span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.of.sel{background:rgba(255,227,106,.28);border-color:#ffe36a}
+#toneRow{display:flex;gap:7px;flex-wrap:wrap}
+.tn{width:30px;height:30px;border-radius:50%;border:3px solid #fff;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.tn.sel{outline:4px solid #ffe36a;transform:scale(1.12)}
+.sw.def{background:linear-gradient(135deg,#ff5a5a,#ffd83a,#3fa0ff);font-size:9px;font-weight:900;color:#fff;text-shadow:0 1px 2px #000;display:flex;align-items:center;justify-content:center;width:46px}
+#previewBox{position:absolute;left:6%;right:6%;top:6%;bottom:14%;touch-action:none;cursor:grab}
+#previewHint{position:absolute;left:0;right:0;bottom:-6px;text-align:center;font-size:11px;letter-spacing:2px;font-weight:900;color:#fff;opacity:.7;text-shadow:0 2px 3px #000;pointer-events:none}
+@media (max-width:900px) and (orientation:portrait){.lobby-left{padding-top:calc(min(30vh,270px) + 6px)}#previewBox{position:fixed;left:50%;right:auto;transform:translateX(-50%);top:6px;bottom:auto;width:64vw;max-width:280px;height:min(30vh,270px);z-index:25}#lobbyInfo{display:none}#previewHint{display:none}}
+@media (max-height:520px){.of span{font-size:11px}#outfitRow{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}}
