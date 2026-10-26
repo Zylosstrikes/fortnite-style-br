@@ -309,10 +309,19 @@ function terrainMesh() {
     const sl = Math.hypot(heights[iz * W1 + Math.min(N, ix + 1)] - heights[iz * W1 + Math.max(0, ix - 1)], heights[Math.min(N, iz + 1) * W1 + ix] - heights[Math.max(0, iz - 1) * W1 + ix]) / (2 * CELLV);
     surfaceColor(x, z, h, sl, c); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
-  const idx = new Uint32Array(N * N * 6); let k = 0;
-  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const a = iz * W1 + ix, b = (iz + 1) * W1 + ix, cc = (iz + 1) * W1 + ix + 1, d = iz * W1 + ix + 1; idx[k++] = a; idx[k++] = b; idx[k++] = d; idx[k++] = b; idx[k++] = cc; idx[k++] = d; }
-  const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3)); g.setIndex(new T.BufferAttribute(idx, 1)); g.computeVertexNormals();
-  const m = new T.Mesh(g, new T.MeshLambertMaterial({ vertexColors: true })); m.receiveShadow = true; return m;
+  // smooth normals over the whole grid (no seams), sliced into frustum-culled chunks
+  const nor = new Float32Array(W1 * W1 * 3);
+  for (let iz = 0; iz <= N; iz++) for (let ix = 0; ix <= N; ix++) { const hx = heights[iz * W1 + Math.min(N, ix + 1)] - heights[iz * W1 + Math.max(0, ix - 1)], hz = heights[Math.min(N, iz + 1) * W1 + ix] - heights[Math.max(0, iz - 1) * W1 + ix]; const nx = -hx / (2 * CELLV), nz = -hz / (2 * CELLV), l = Math.hypot(nx, 1, nz); const i = iz * W1 + ix; nor[i * 3] = nx / l; nor[i * 3 + 1] = 1 / l; nor[i * 3 + 2] = nz / l; }
+  const grp = new T.Group(), CS = 25, mat = new T.MeshLambertMaterial({ vertexColors: true });
+  for (let cz = 0; cz < N / CS; cz++) for (let cx = 0; cx < N / CS; cx++) {
+    const w = CS + 1, p2 = new Float32Array(w * w * 3), c2 = new Float32Array(w * w * 3), n2 = new Float32Array(w * w * 3);
+    for (let z = 0; z < w; z++) for (let x = 0; x < w; x++) { const si = (cz * CS + z) * W1 + cx * CS + x, di = z * w + x; for (let k = 0; k < 3; k++) { p2[di * 3 + k] = pos[si * 3 + k]; c2[di * 3 + k] = col[si * 3 + k]; n2[di * 3 + k] = nor[si * 3 + k]; } }
+    const idx = new Uint16Array(CS * CS * 6); let k = 0;
+    for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) { const a = z * w + x, b = (z + 1) * w + x, cc = (z + 1) * w + x + 1, d = z * w + x + 1; idx[k++] = a; idx[k++] = b; idx[k++] = d; idx[k++] = b; idx[k++] = cc; idx[k++] = d; }
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(p2, 3)); g.setAttribute('color', new T.BufferAttribute(c2, 3)); g.setAttribute('normal', new T.BufferAttribute(n2, 3)); g.setIndex(new T.BufferAttribute(idx, 1)); g.computeBoundingSphere(); g.computeBoundingBox();
+    const m = new T.Mesh(g, mat); m.receiveShadow = true; grp.add(m);
+  }
+  return grp;
 }
 
 W.build = function (scene) {
@@ -403,25 +412,30 @@ W.build = function (scene) {
   const trunkGeo = new T.CylinderGeometry(0.22, 0.34, 1, 6); trunkGeo.translate(0, 0.5, 0);
   const coneGeo = new T.ConeGeometry(1.9, 3.2, 7); coneGeo.translate(0, 1.6, 0); const cone2Geo = new T.ConeGeometry(1.4, 2.6, 7); cone2Geo.translate(0, 1.3, 0);
   const oakGeo = new T.IcosahedronGeometry(2.0, 0);
-  const nT = W.trees.length; const mTrunk = new T.InstancedMesh(trunkGeo, new T.MeshLambertMaterial({ color: 0x8a5a33 }), nT);
-  const mP1 = new T.InstancedMesh(coneGeo, new T.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, pines.length)), mP2 = new T.InstancedMesh(cone2Geo, new T.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, pines.length));
-  const mOak = new T.InstancedMesh(oakGeo, new T.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, oaks.length));
-  [mTrunk, mP1, mP2, mOak].forEach(m => { m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; scene.add(m); });
+  const tMat = new T.MeshLambertMaterial({ color: 0x8a5a33 }), fMat = new T.MeshLambertMaterial({ color: 0xffffff });
+  // spatial chunks: instanced meshes can't use three's built-in culling, so each chunk is shown/hidden by W.cullTrees() every frame
+  const CH = 110, chunks = new Map(); const chunkOf = (x, z) => { const k = Math.floor((x + 600) / CH) + ',' + Math.floor((z + 600) / CH); let c = chunks.get(k); if (!c) { c = { nT: 0, nP: 0, nO: 0, x0: Math.floor((x + 600) / CH) * CH - 600, z0: Math.floor((z + 600) / CH) * CH - 600 }; chunks.set(k, c); } return c; };
+  for (const t of W.trees) { const c = chunkOf(t.x, t.z); t.c = c; c.nT++; if (t.pine) c.nP++; else c.nO++; }
+  W.treeChunks = [];
+  for (const c of chunks.values()) {
+    c.mTrunk = new T.InstancedMesh(trunkGeo, tMat, c.nT); c.mP1 = c.nP ? new T.InstancedMesh(coneGeo, fMat, c.nP) : null; c.mP2 = c.nP ? new T.InstancedMesh(cone2Geo, fMat, c.nP) : null; c.mOak = c.nO ? new T.InstancedMesh(oakGeo, fMat, c.nO) : null; c.iT = c.iP = c.iO = 0;
+    for (const m of [c.mTrunk, c.mP1, c.mP2, c.mOak]) if (m) { m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; scene.add(m); }
+    c.box = new T.Box3(new T.Vector3(c.x0 - 4, -20, c.z0 - 4), new T.Vector3(c.x0 + CH + 4, 120, c.z0 + CH + 4)); W.treeChunks.push(c);
+  }
   const mat4 = new T.Matrix4(), q = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), col = new T.Color();
   const pineCols = [0x2e9a4a, 0x3aa84f, 0x278f5a, 0x4bb860], oakCols = [0x6fd24a, 0x58c43f, 0x8ada4c, 0x6fd24a, 0xf2b13a, 0xff8c5a, 0xf58fc0];
-  let ti = 0, pi = 0, oi = 0;
   for (const t of W.trees) {
-    q.setFromAxisAngle(new T.Vector3(0, 1, 0), R(0, 6.28));
-    const th = t.pine ? 2.2 : 2.6; ps.set(t.x, t.y - 0.2, t.z); sc.set(t.s, th * t.s, t.s); mat4.compose(ps, q, sc); mTrunk.setMatrixAt(ti, mat4); t.insts.push({ m: mTrunk, i: ti }); ti++;
+    const c = t.c; q.setFromAxisAngle(new T.Vector3(0, 1, 0), R(0, 6.28));
+    const th = t.pine ? 2.2 : 2.6; ps.set(t.x, t.y - 0.2, t.z); sc.set(t.s, th * t.s, t.s); mat4.compose(ps, q, sc); c.mTrunk.setMatrixAt(c.iT, mat4); t.insts.push({ m: c.mTrunk, i: c.iT }); c.iT++;
     if (t.pine) {
-      ps.set(t.x, t.y + th * t.s * 0.6, t.z); sc.set(t.s, t.s, t.s); mat4.compose(ps, q, sc); mP1.setMatrixAt(pi, mat4); col.setHex(pineCols[Math.floor(rng() * 4)]); if (t.y > 40) col.lerp(new T.Color(0xeaf6ff), 0.55); mP1.setColorAt(pi, col);
-      ps.set(t.x, t.y + th * t.s * 0.6 + 2.0 * t.s, t.z); mat4.compose(ps, q, sc); mP2.setMatrixAt(pi, mat4); mP2.setColorAt(pi, col); t.insts.push({ m: mP1, i: pi }, { m: mP2, i: pi }); pi++;
+      ps.set(t.x, t.y + th * t.s * 0.6, t.z); sc.set(t.s, t.s, t.s); mat4.compose(ps, q, sc); c.mP1.setMatrixAt(c.iP, mat4); col.setHex(pineCols[Math.floor(rng() * 4)]); if (t.y > 40) col.lerp(new T.Color(0xeaf6ff), 0.55); c.mP1.setColorAt(c.iP, col);
+      ps.set(t.x, t.y + th * t.s * 0.6 + 2.0 * t.s, t.z); mat4.compose(ps, q, sc); c.mP2.setMatrixAt(c.iP, mat4); c.mP2.setColorAt(c.iP, col); t.insts.push({ m: c.mP1, i: c.iP }, { m: c.mP2, i: c.iP }); c.iP++;
     } else {
-      ps.set(t.x, t.y + th * t.s + 0.8 * t.s, t.z); sc.set(t.s, t.s * 0.9, t.s); mat4.compose(ps, q, sc); mOak.setMatrixAt(oi, mat4); col.setHex(oakCols[Math.floor(rng() * oakCols.length)]); mOak.setColorAt(oi, col); t.insts.push({ m: mOak, i: oi }); oi++;
+      ps.set(t.x, t.y + th * t.s + 0.8 * t.s, t.z); sc.set(t.s, t.s * 0.9, t.s); mat4.compose(ps, q, sc); c.mOak.setMatrixAt(c.iO, mat4); col.setHex(oakCols[Math.floor(rng() * oakCols.length)]); c.mOak.setColorAt(c.iO, col); t.insts.push({ m: c.mOak, i: c.iO }); c.iO++;
     }
     addBox({ x0: t.x - 0.4, x1: t.x + 0.4, z0: t.z - 0.4, z1: t.z + 0.4, y0: t.y - 1, y1: t.y + 5.5, kind: 'tree', mat: 'wood', hp: 6, tree: t, col: 0x8a5a33 }).tree = t; t.box = null;
   }
-  [mTrunk, mP1, mP2, mOak].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
+  for (const c of W.treeChunks) for (const m of [c.mTrunk, c.mP1, c.mP2, c.mOak]) if (m) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   // rocks
   const rockGeo = new T.IcosahedronGeometry(1, 0); const nR = 260; const mRock = new T.InstancedMesh(rockGeo, new T.MeshLambertMaterial({ color: 0xffffff }), nR); mRock.castShadow = true; mRock.frustumCulled = false; scene.add(mRock);
   let rc = 0, rtry = 0; const rockCols = [0x9ea2ad, 0x8b8f9b, 0xaeb2bd, 0x7d8290];
@@ -441,11 +455,16 @@ W.build = function (scene) {
   // vehicle spawns along roads
   for (let i = 0; i < roads.length; i++) { const r = roads[i]; for (const t of [0.3, 0.6]) { const x = r[0] + (r[2] - r[0]) * t + R(-3, 3), z = r[1] + (r[3] - r[1]) * t + R(-3, 3); if (heightAt(x, z) > 1.5 && !rects.some(q => x > q.x0 - 3 && x < q.x1 + 3 && z > q.z0 - 3 && z < q.z1 + 3)) W.vehicleSpawns.push({ x, z, yaw: Math.atan2(-(r[2] - r[0]), -(r[3] - r[1])) }); } }
   // clouds
-  const cg = new T.IcosahedronGeometry(1, 1), cm = new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9fb4c8, transparent: true, opacity: 0.95 });
-  for (let i = 0; i < 26; i++) { const g = new T.Group(); const n = 4 + Math.floor(rng() * 4); for (let j = 0; j < n; j++) { const m = new T.Mesh(cg, cm); const s = R(14, 30); m.scale.set(s * 1.4, s * 0.6, s); m.position.set(j * 22 - n * 11 + R(-6, 6), R(-4, 4), R(-10, 10)); g.add(m); } g.position.set(R(-900, 900), R(160, 320), R(-900, 900)); scene.add(g); W.clouds.push(g); }
+  const cg = new T.IcosahedronGeometry(1, 1), cm = new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9fb4c8, transparent: true, opacity: 0.95 }), cmM = new T.Matrix4(), cq = new T.Quaternion(), cs = new T.Vector3(), cp = new T.Vector3();
+  for (let i = 0; i < 26; i++) { const parts = []; const n = 4 + Math.floor(rng() * 4); for (let j = 0; j < n; j++) { const s2 = R(14, 30); cs.set(s2 * 1.4, s2 * 0.6, s2); cp.set(j * 22 - n * 11 + R(-6, 6), R(-4, 4), R(-10, 10)); cmM.compose(cp, cq.identity(), cs); parts.push({ geo: cg, matrix: cmM.clone() }); }
+    const m = new T.Mesh(G.mergeGeoms(parts), cm); m.position.set(R(-900, 900), R(160, 320), R(-900, 900)); scene.add(m); W.clouds.push(m); }
   W.renderMap();
 };
 
+const _fr = new T.Frustum(), _pm = new T.Matrix4();
+/* per-frame frustum + distance culling of the instanced tree chunks */
+W.cullTrees = function (cam, far) { if (!W.treeChunks) return; cam.updateMatrixWorld(); _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm); const cx = cam.position.x, cz = cam.position.z;
+  for (const c of W.treeChunks) { const dx = Math.max(c.x0 - cx, 0, cx - (c.x0 + 110)), dz = Math.max(c.z0 - cz, 0, cz - (c.z0 + 110)); const vis = dx * dx + dz * dz < far * far && _fr.intersectsBox(c.box); c.mTrunk.visible = vis; if (c.mP1) { c.mP1.visible = vis; c.mP2.visible = vis; } if (c.mOak) c.mOak.visible = vis; } };
 W.updateClouds = function (dt) { for (const c of W.clouds) { c.position.x += dt * 3; if (c.position.x > 1000) c.position.x = -1000; } if (W.waterTex) { W.waterTex.offset.x += dt * 0.004; W.waterTex.offset.y += dt * 0.002; } };
 
 /* ---------------- minimap source image ---------------- */

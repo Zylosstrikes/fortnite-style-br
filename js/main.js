@@ -17,12 +17,12 @@ window.addEventListener('error', e => { const b = $('errbox'); b.style.display =
 
 /* ================= init ================= */
 function init() {
-  const canvas = $('c'); renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6)); renderer.setSize(innerWidth, innerHeight);
+  const canvas = $('c'); renderer = G.renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6)); renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
   scene = G.scene = new T.Scene(); scene.fog = new T.Fog(0xcfe9ff, 260, 1150);
   camera = G.cam = new T.PerspectiveCamera(72, innerWidth / innerHeight, 0.15, 3000); camera.rotation.order = 'YXZ';
   scene.add(new T.HemisphereLight(0xdff1ff, 0x92c96e, 0.62));
-  sun = new T.DirectionalLight(0xfff1d0, 0.82); sun.position.set(60, 100, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 1; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6; scene.add(sun); scene.add(sun.target);
+  sun = new T.DirectionalLight(0xfff1d0, 0.82); sun.position.set(60, 100, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -75; sc.right = 75; sc.top = 75; sc.bottom = -75; sc.near = 1; sc.far = 400; sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.6; scene.add(sun); scene.add(sun.target); G.sun = sun;
   // sky
   sky = new T.Mesh(new T.SphereGeometry(2400, 24, 14), new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, fog: false, uniforms: { top: { value: new T.Color(0x2f8cff) }, bot: { value: new T.Color(0xcfe9ff) } },
     vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
@@ -30,6 +30,8 @@ function init() {
   sky.renderOrder = -10; scene.add(sky);
   sunDisc = new T.Mesh(new T.SphereGeometry(70, 12, 8), new T.MeshBasicMaterial({ color: 0xfff6c0, fog: false })); scene.add(sunDisc);
   G.makeBuildMaterials(); G.FX.init(scene); G.World.build(scene);
+  if (!G._rigMerged) { G._rigMerged = true; const mk = G.makeCharacter; G.makeCharacter = function (skin) { return G.mergeRig(mk(skin)); }; }
+  { const GQ = G.Q; GQ.auto = !Q.has('noadapt'); G.shadowsOn = true; const ql = Q.has('q') ? parseInt(Q.get('q'), 10) : (detectTouch() || Math.min(innerWidth, innerHeight) < 600 ? 1 : 2); GQ.apply(isNaN(ql) ? 1 : ql); if (Q.has('q')) GQ.auto = false; }
   // bus
   G.bus = { mesh: G.makeBus(), active: false, x: 0, y: 220, z: 0, dx: 1, dz: 0, vx: 0, vz: 0, t: 0 }; scene.add(G.bus.mesh);
   // storm wall
@@ -190,7 +192,7 @@ function bindInput() {
   initLobbyDrag();
   document.addEventListener('gesturestart', e => e.preventDefault()); document.addEventListener('dblclick', e => e.preventDefault());
   document.addEventListener('touchmove', e => { if (e.touches.length > 1 || !(e.target.closest && e.target.closest('.lobby-left,.panel'))) e.preventDefault(); }, { passive: false });
-  $('optShadow').onchange = e => { renderer.shadowMap.enabled = e.target.checked; sun.castShadow = e.target.checked; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); };
+  $('optShadow').onchange = e => { G.shadowsOn = e.target.checked; G.Q.applied = -1; G.Q.apply(G.Q.level); };
   $('optSound').onchange = e => { if (G.Audio.muted === e.target.checked) G.Audio.toggleMute(); };
   const saved = localStorage.getItem('sf_name'); if (saved) $('nameInput').value = saved;
   document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing' && !state.ended) { /* auto-pause by pointer lock loss */ } });
@@ -353,10 +355,12 @@ function updateLootViz(dt) {
   }
   const t = G.time; for (const v of lootViz) if (v.cur) { if (v.cur.taken) { v.cur = null; v.g.visible = false; continue; } v.beam.visible = (v.cur.x - camera.position.x) ** 2 + (v.cur.z - camera.position.z) ** 2 > 36; v.holder.rotation.y = t * 1.6; v.holder.position.y = 0.75 + Math.sin(t * 2.5 + v.cur.id) * 0.12; }
 }
+/* distant characters stop casting shadows (halves their draw calls: every caster is drawn again in the shadow pass) */
+function rigShadow(r, on) { if (r._sh === on) return; r._sh = on; if (!r._ms) { r._ms = []; r.root.traverse(o => { if (o.isMesh && o.castShadow) r._ms.push(o); }); } for (const m of r._ms) m.castShadow = on; }
 function updateCull(dt) {
   cullT -= dt; if (cullT > 0) return; cullT = 0.3; const cx = camera.position.x, cz = camera.position.z;
   for (const c of G.chests) { const d = Math.hypot(c.x - cx, c.z - cz); c.grp.visible = !c.gone && d < 380; c.mesh.visible = c.lid.visible = d < 130; }
-  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < 280 && !(a.hidden && d > 9); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
+  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < G.actorFar && !(a.hidden && d > 9); rigShadow(a.rig, d < G.shadowActorDist); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
 }
 
 /* ================= camera ================= */
@@ -451,11 +455,11 @@ function simStep(dt) {
 G.simStep = simStep;
 
 function frame(ts) {
-  requestAnimationFrame(frame); const dt = Math.min(0.05, (ts - lastT) / 1000 || 0.016); lastT = ts;
+  requestAnimationFrame(frame); const rawDt = (ts - lastT) / 1000 || 0.016, dt = Math.min(0.05, rawDt); lastT = ts; if (rawDt < 0.5) G.Q.tick(rawDt);
   if (state.phase === 'loading') return;
-  if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); renderer.render(scene, camera); return; }
+  if (state.phase === 'lobby') { updateBus(dt); G.World.updateClouds(dt); updateCamera(dt); G.World.cullTrees(camera, 1500); renderer.render(scene, camera); return; }
   if (!state.paused && !state.helpOpen) simStep(dt);
-  updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt);
+  updateCamera(dt); updateGhost(); updateLootViz(dt); updateCull(dt); G.World.cullTrees(camera, G.cullFar);
   uiT -= dt; G.UI.update(dt); if (G.touchOn) touchUpdate(); G.UI.drawMini(); if (state.mapOpen) G.UI.drawBig();
   renderer.render(scene, camera);
 }
@@ -468,6 +472,8 @@ G.debug = {
   step(n, dt) { for (let i = 0; i < n; i++) { simStep(dt || 0.05); } },
   fastForward(sec) { G.time += sec; const S = G.storm; for (let i = 0; i < sec * 10; i++) updateStorm(0.1); },
   warpBus(t) { const b = G.bus; if (b.active) { b.x += b.vx * t; b.z += b.vz * t; b.t += t; } },
+  look(y, p) { yaw = y; pitch = p; },
+  cull() { cullT = 0; updateCull(0.01); G.World.cullTrees(camera, G.cullFar); },
   state, mouse,
 };
 
