@@ -62,7 +62,7 @@ G.updateHeld = function (a) {
 };
 G.selectSlot = function (a, i) {
   if (!a.alive || i < 0 || i > 5) return; if (a.inv[i] === null && i !== a.sel) return;
-  if (a.action) a.action = null; a.reloading = 0; a.sel = i; a.buildMode = false; G.updateHeld(a); if (a.isPlayer) G.Audio.play('click', 0.6);
+  if (a.action) a.action = null; a.reloading = 0; if (a.sel !== i && G.Anim && a.rig && a.state === 'ground') G.Anim.trigger(a, 'equip'); a.sel = i; a.buildMode = false; G.updateHeld(a); if (a.isPlayer) G.Audio.play('click', 0.6);
 };
 function itemOf(s) { return !s ? null : s.type === 'weapon' ? { kind: 'weapon', w: s.w, rarity: s.rarity } : s.type === 'heal' ? { kind: 'heal', id: s.id, n: s.n } : s.type === 'gadget' ? { kind: 'gadget', id: s.id, n: s.n } : null; }
 G.dropAt = function (item, x, y, z, spread) { const ang = Math.random() * 6.28, r = spread === undefined ? G.rand(0.8, 1.6) : spread; const lx = x + Math.cos(ang) * r, lz = z + Math.sin(ang) * r; return G.addLoot(item, lx, Math.max(y, G.World.heightAt(lx, lz) + 0.1), lz); };
@@ -115,6 +115,7 @@ G.damageActor = function (t, dmg, att, head, wname) {
   dmg = Math.round(dmg); if (dmg <= 0) return; let rem = dmg;
   if (t.shield > 0) { const s = Math.min(t.shield, rem); t.shield -= s; rem -= s; } t.hp -= rem; t.stats.taken += dmg; t.lastHitT = G.time; t.lastAttacker = att;
   if (att && att !== t) { att.stats.dealt += dmg; att.stats.hits++; if (att.isPlayer) { G.hook('hitmarker', head, t.hp <= 0, dmg); G.Audio.play(head ? 'headshot' : 'hit', 0.8); G.hook('dmgnum', t, dmg, head); } }
+  if (G.Anim && t.hp > 0 && G.time - (t.lastHitAnim || -9) > 0.3) { t.lastHitAnim = G.time; G.Anim.trigger(t, 'hit'); }
   if (t.isPlayer) { G.Audio.play('hurt'); if (att) G.hook('damaged', att, dmg); }
   else if (G.AI) G.AI.onHit(t, att);
   if (t.hp <= 0) G.killActor(t, att, wname || 'weapon');
@@ -159,7 +160,7 @@ G.tryFire = function (a, tx, ty, tz) {
   const it = a.inv[a.sel]; if (!it || it.type !== 'weapon') return false; if (a.fireCD > 0 || a.reloading > 0 || a.action || a.state !== 'ground' || a.vehicle) return false;
   const Wp = G.WEAPONS[it.w], R = G.RARITY[it.rarity];
   if (it.mag <= 0) { a.fireCD = 0.3; if (a.ammo[Wp.ammo] > 0) G.startReload(a); else if (a.isPlayer) { G.Audio.play('empty'); G.hook('msg', 'Out of ' + G.AMMO[Wp.ammo].name.toLowerCase()); } return false; }
-  it.mag--; a.fireCD = 1 / (Wp.rate * (1 + 0.025 * it.rarity)); a.stats.shots++; a.lastShotT = G.time;
+  it.mag--; a.fireCD = 1 / (Wp.rate * (1 + 0.025 * it.rarity)); a.stats.shots++; a.lastShotT = G.time; if (G.Anim) G.Anim.shoot(a);
   const m = G.muzzle(a, _mz); let dx = tx - m.x, dy = ty - m.y, dz = tz - m.z; const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
   const mv = Math.min(1, a.speedNow / 7), spread = Wp.spread * (1 + a.bloom * 1.2) * (1 + mv * 0.9) * (a.input.ads ? 0.55 : 1) * (a.isBot ? (a.ai ? a.ai.spreadMul : 1) : 1);
   a.bloom = Math.min(1, a.bloom + 0.12); a.rig.flash.visible = true; a.flashT = 0.05; a.recoil = (a.recoil || 0) + (Wp.rocket ? 0.1 : it.w === 'sniper' ? 0.09 : it.w === 'shotgun' ? 0.07 : 0.018);
@@ -247,7 +248,7 @@ const Build = G.Build = {
   },
   canPlace(a, sp) { if (G.pieces.has(sp.key)) return false; if (a.mats[a.buildMat] < G.MATS[a.buildMat].cost) return false; if (G.World.heightAt(sp.cx, sp.cz) < -3 && sp.lv < 0) return false; return true; },
   place(a, sp) {
-    if (!Build.canPlace(a, sp)) return null; const mat = a.buildMat; a.mats[mat] -= G.MATS[mat].cost; a.stats.built++;
+    if (!Build.canPlace(a, sp)) return null; if (G.Anim && a.rig) G.Anim.trigger(a, 'build_place'); const mat = a.buildMat; a.mats[mat] -= G.MATS[mat].cost; a.stats.built++;
     const p = { key: sp.key, type: sp.type, o: sp.o, gx: sp.gx, gz: sp.gz, lv: sp.lv, d: sp.d, mat, hp: G.MATS[mat].hp, max: G.MATS[mat].hp, cx: sp.cx, cz: sp.cz, edit: 0, boxes: [], meshes: [], owner: a, dead: false };
     G.pieces.set(p.key, p); G.pieceList.push(p); Build.build(p); G.Audio.at('build', p.cx, p.lv, p.cz); FX.burst(p.cx, p.lv + 1.5, p.cz, G.MATS[mat].color, 8, 5, 0.2, 0.5, 6); return p;
   },
@@ -387,9 +388,9 @@ G.updateActor = function (a, dt) {
 function openGlider(a) { a.state = 'glide'; a.glideOpen = true; a.rig.glider.visible = true; a.rig.lean.rotation.x = -0.05; if (a.isPlayer) G.Audio.play('glide'); else G.Audio.at('glide', a.x, a.y, a.z, 0.5); }
 G.openGlider = openGlider;
 G.jumpFromBus = function (a, bus) {
-  a.state = "freefall"; a.jumpedAt = G.time; a.x = bus.x; a.y = bus.y - 3; a.z = bus.z; a.vx = bus.vx * 0.7; a.vz = bus.vz * 0.7; a.vy = -2; a.yaw = a.isPlayer ? a.yaw : a.yaw; a.rig.root.visible = true; a.rig.setLOD(2); G.Audio.at('jump', a.x, a.y, a.z, 0.6);
+  a.state = "freefall"; a.jumpedAt = G.time; a.x = bus.x; a.y = bus.y - 3; a.z = bus.z; a.vx = bus.vx * 0.7; a.vz = bus.vz * 0.7; a.vy = -2; a.yaw = a.isPlayer ? a.yaw : a.yaw; a.rig.root.visible = true; a.rig.setLOD(a.isPlayer ? 0 : 2); G.Audio.at('jump', a.x, a.y, a.z, 0.6);
 };
-G.startEmote = function (a, name) { if (!a.alive || a.state !== 'ground' || a.vehicle) return; a.emote = { name, t: 0, dur: name === 'wave' ? 2.4 : 3.6 }; a.reloading = 0; G.Audio.at('emote', a.x, a.y, a.z, 0.8); };
+G.startEmote = function (a, name) { if (!a.alive || a.state !== 'ground' || a.vehicle) return; if (G.Anim && G.Anim.info(name)) a.emote = { name, t: 0, dur: G.Anim.emoteDur(name) }; else a.emote = { name, t: 0, dur: name === 'wave' ? 2.4 : 3.6 }; a.reloading = 0; G.Audio.at('emote', a.x, a.y, a.z, 0.8); };
 
 /* ---------- rig animation ---------- */
 function animateBase(a, dt) {
@@ -439,7 +440,7 @@ function animateProc(a, dt) {
   else if (a.action) { E[0].rotation.x = 1.3; E[1].rotation.x = 1.3; }
   r.head.rotation.x = G.clamp((a.pitch || 0) * 0.5, -0.5, 0.5);
 }
-function animate(a, dt) { animateProc(a, dt); if (G.Clips && G.Clips.ready) G.Clips.apply(a, dt); }
+function animate(a, dt) { animateProc(a, dt); if (G.Anim) G.Anim.update(a, dt); }
 G.animateRig = animate;
 
 /* ================= update all ================= */

@@ -43,9 +43,10 @@
   <!-- LOCKER -->
   <div id="locker" class="panel2 hidden">
     <div class="ptitle">LOCKER</div>
-    <div id="lockTabs"><button class="ltab sel" data-lt="outfit">OUTFITS</button><button class="ltab" data-lt="pick">PICKAXE</button><button class="ltab" data-lt="glider">GLIDER &amp; TINT</button><button class="ltab" data-lt="skin">SKIN TONE</button></div>
+    <div id="lockTabs"><button class="ltab sel" data-lt="outfit">OUTFITS</button><button class="ltab" data-lt="pick">PICKAXE</button><button class="ltab" data-lt="emote">EMOTES</button><button class="ltab" data-lt="glider">GLIDER &amp; TINT</button><button class="ltab" data-lt="skin">SKIN TONE</button></div>
     <div class="lpane" data-lp="outfit"><div id="outfitRow"></div></div>
     <div class="lpane hidden" data-lp="pick"><div id="pickRow"></div></div>
+    <div class="lpane hidden" data-lp="emote"><div class="lnote">Tap an emote to preview it on your character. In a match press <b>B</b> for the emote menu (T / Y / U / I = quick emotes).</div><div id="emoteGrid"></div><button id="emoteStop" class="smallbtn">STOP</button></div>
     <div class="lpane hidden" data-lp="glider"><div class="lnote">Your glider and outfit accents use this colour.</div><div id="swatches"></div></div>
     <div class="lpane hidden" data-lp="skin"><div id="toneRow"></div></div>
   </div>
@@ -78,6 +79,8 @@
   <div id="scope"></div>
   <div id="dmgnums"></div>
   <div id="prompt"></div>
+  <div id="emoteMenu" class="hidden"><div class="emtitle">EMOTES <small>click or press 1-9, 0 · B / Esc to close</small></div><div id="emGrid"></div></div>
+  <div id="ctrlPill" class="deskonly"><span id="cpFire"><kbd>LEFT CLICK</kbd><b>FIRE</b></span><span><kbd>RIGHT CLICK</kbd><b>AIM</b></span><span><kbd>E</kbd><b>INTERACT</b></span><span><kbd>R</kbd><b>RELOAD</b></span></div>
   <div id="statusTags"><div id="hideTag">HIDDEN IN BUSH</div><div id="campTag">CAMPFIRE — HEALING</div></div>
   <div id="progressWrap"><div id="progressLabel"></div><div id="progress"><i></i></div></div>
   <div id="toast"></div>
@@ -90,7 +93,7 @@
     <div id="bars"><div class="bar sh"><i id="shBar"></i><b id="shTxt">0</b></div><div class="bar hp"><i id="hpBar"></i><b id="hpTxt">100</b></div></div>
     <div id="hotbar"></div>
     <div id="buildbar" class="hidden"></div>
-    <div id="keyHints" class="deskonly"><span><kbd>WASD</kbd>move</span><span><kbd>SHIFT</kbd>sprint</span><span><kbd>SPACE</kbd>jump</span><span><kbd>E</kbd>use</span><span><kbd>R</kbd>reload</span><span><kbd>Q</kbd><kbd>F</kbd><kbd>Z</kbd><kbd>C</kbd>build</span><span><kbd>G</kbd>mat</span><span><kbd>X</kbd>edit</span><span><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>emote</span><span><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd>look</span><span><kbd>M</kbd>map</span><span><kbd>H</kbd>help</span><span><kbd>N</kbd>mute</span></div>
+    <div id="keyHints" class="deskonly"><span><kbd>LEFT CLICK</kbd>fire</span><span><kbd>RIGHT CLICK</kbd>aim</span><span><kbd>WASD</kbd>move</span><span><kbd>SHIFT</kbd>sprint</span><span><kbd>SPACE</kbd>jump</span><span><kbd>E</kbd>interact</span><span><kbd>R</kbd>reload</span><span><kbd>Q</kbd><kbd>F</kbd><kbd>Z</kbd><kbd>C</kbd>build</span><span><kbd>G</kbd>mat</span><span><kbd>X</kbd>edit</span><span><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd>emote</span><span><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd>look</span><span><kbd>M</kbd>map</span><span><kbd>H</kbd>help</span><span><kbd>N</kbd>mute</span></div>
   </div>
   <!-- bottom-left (desktop): materials -->
   <div id="matsBox"></div>
@@ -135,7 +138,8 @@
 <script src="js/models2.js"></script>
 <script src="js/models3.js"></script>
 <script src="js/assets.js"></script>
-<script src="js/clips.js"></script>
+<script src="js/animdata.js"></script>
+<script src="js/anim.js"></script>
 <script src="js/actors.js"></script>
 <script src="js/bots.js"></script>
 <script src="js/features.js"></script>

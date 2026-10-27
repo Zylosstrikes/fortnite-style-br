@@ -2,7 +2,7 @@
 /* Lobby menu: PLAY / LOCKER / QUESTS / CAREER tabs, locker (outfit, pickaxe, glider/tint, skin tone), settings, party slots, emote/back/chat. */
 (function () {
 const G = window.G; const $ = id => document.getElementById(id); const U = G.LobbyUI = {};
-let tab = 'play'; document.addEventListener('DOMContentLoaded', () => { const l = document.getElementById('lobby'); if (l) l.dataset.tab = 'play'; }); const EMOTES = ['dance', 'wave', 'flex', 'spin']; let ei = 0;
+let tab = 'play'; document.addEventListener('DOMContentLoaded', () => { const l = document.getElementById('lobby'); if (l) l.dataset.tab = 'play'; }); let ei = 0; const EMOTES = () => (G.Anim && G.Anim.emotes) || ['dance', 'wave', 'flex', 'spin'];
 const panels = { locker: 'locker', quests: 'questsPanel', career: 'careerPanel' };
 function show(t) {
   tab = t; document.querySelectorAll('.ntab').forEach(b => b.classList.toggle('sel', b.dataset.tab === t));
@@ -18,9 +18,11 @@ function careerFill() {
 function init() {
   document.querySelectorAll('.ntab').forEach(b => b.addEventListener('click', () => show(b.dataset.tab)));
   document.querySelectorAll('.ltab').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.ltab').forEach(x => x.classList.toggle('sel', x === b)); document.querySelectorAll('.lpane').forEach(p => p.classList.toggle('hidden', p.dataset.lp !== b.dataset.lt)); }));
+  const eg = $('emoteGrid'); if (eg) { EMOTES().forEach((n, i) => { const b = document.createElement('button'); b.dataset.e = n; b.innerHTML = '<i>' + (i + 1) + '</i>' + ((G.Anim && G.Anim.labels[n]) || n.toUpperCase()); b.onclick = () => { eg.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b)); if (G.Anim) G.Anim.lobbyPlay(n, { hold: true }); }; eg.appendChild(b); });
+    $('emoteStop').onclick = () => { eg.querySelectorAll('button').forEach(x => x.classList.remove('sel')); if (G.Anim) G.Anim.lobbyStop(); }; }
   $('gearBtn').addEventListener('click', () => { const s = $('lobbySettings'); const open = s.classList.contains('hidden'); show('play'); s.classList.toggle('hidden', !open); });
   $('backBtn').addEventListener('click', () => { if (tab !== 'play' || !$('lobbySettings').classList.contains('hidden') || !$('lobbyChat').classList.contains('hidden')) { show('play'); $('lobbyChat').classList.add('hidden'); } else G.UI.toast('Already at the main lobby', 1400); });
-  $('emoteBtn').addEventListener('click', () => { if (G.lobbyEmote) G.lobbyEmote(EMOTES[ei++ % EMOTES.length]); });
+  $('emoteBtn').addEventListener('click', () => { if (G.lobbyEmote) G.lobbyEmote(EMOTES()[ei++ % EMOTES().length]); });
   $('chatBtn').addEventListener('click', () => $('lobbyChat').classList.toggle('hidden'));
   const send = () => { const i = $('chatIn'), v = i.value.trim(); if (!v) return; const p = document.createElement('p'); p.innerHTML = '<b></b> '; p.firstChild.textContent = ($('nameInput').value || 'Player'); p.appendChild(document.createTextNode(v)); $('chatLog').appendChild(p); i.value = ''; $('chatLog').scrollTop = 1e6; };
   $('chatSend').addEventListener('click', send); $('chatIn').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') send(); });

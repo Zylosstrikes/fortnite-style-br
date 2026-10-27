@@ -86,7 +86,7 @@ AI.update = function (a, dt) {
   if (a.vehicle) return;
   if (ai.mode === 'air') { ai.mode = 'ground'; if (a.mats.wood < 50) { a.mats.wood = Math.floor(G.rand(30, 140)); a.mats.stone = Math.floor(G.rand(0, 60)); a.mats.metal = Math.floor(G.rand(0, 40)); } }
   ai.buildCD -= dt; ai.senseT -= dt;
-  if (G.time < ai.emoteT && !a.emote && !ai.enemy) { ai.emoteT = 0; G.startEmote(a, G.pick(['dance', 'wave', 'flex', 'spin'])); }
+  if (G.time < ai.emoteT && !a.emote && !ai.enemy) { ai.emoteT = 0; G.startEmote(a, G.pick(G.Anim ? G.Anim.emotes : ['dance', 'wave', 'flex', 'spin'])); }
   if (a.emote) return;
   if (ai.senseT <= 0) { ai.senseT = 0.22 + Math.random() * 0.1; senseEnemy(a); if (G.time % 3 < 0.3) G.autoAmmo(a); }
   if (a.id % 4 === Math.floor(G.time * 4) % 4) G.autoAmmo(a);
@@ -112,7 +112,7 @@ AI.update = function (a, dt) {
     const p = ai.path[ai.pi]; if (!p) { ai.target = null; return; } const d = walkTo(a, p.x, p.z, dt, !hasAmmoWeapon(a) || ai.skill > 0.6); ai.mode = 'loot'; if (!ai.target) return;
     if (ai.pi < ai.path.length - 1) { if (d < 1.4) ai.pi++; }
     else { const o = ai.target.o; const dd = Math.hypot(o.x - a.x, o.z - a.z); if (dd < (ai.target.kind === 'chest' ? 2.2 : 1.8)) {
-      if (ai.target.kind === 'chest') { G.World.openChest(o); G.Audio.at('chest', o.x, o.y, o.z); } else { const it = o.item; if (it.kind === 'weapon' && weaponsOf(a).length >= 3) { let wi = weaponsOf(a).sort((x, y) => ws(a.inv[x]) - ws(a.inv[y]))[0]; a.sel = wi; } G.pickupLoot(a, o); if (!a.inv[a.sel]) a.sel = 0; G.updateHeld(a); if (!hasAmmoWeapon(a) === false) equipBest(a, 30); }
+      if (ai.target.kind === 'chest') { G.World.openChest(o, a); G.Audio.at('chest', o.x, o.y, o.z); } else { const it = o.item; if (it.kind === 'weapon' && weaponsOf(a).length >= 3) { let wi = weaponsOf(a).sort((x, y) => ws(a.inv[x]) - ws(a.inv[y]))[0]; a.sel = wi; } G.pickupLoot(a, o); if (!a.inv[a.sel]) a.sel = 0; G.updateHeld(a); if (!hasAmmoWeapon(a) === false) equipBest(a, 30); }
       ai.target = null; } }
     return;
   }

@@ -274,7 +274,8 @@ body.touch.port #stormBox{padding:2px 10px}
 #emoteWheel .ring{position:relative;width:236px;height:236px}
 #emoteWheel .tb{position:absolute;width:76px;height:76px;font-size:12px;background:rgba(30,60,130,.85)}
 #emoteWheel .tb:nth-child(1){left:80px;top:0}#emoteWheel .tb:nth-child(2){left:160px;top:80px}#emoteWheel .tb:nth-child(3){left:80px;top:160px}#emoteWheel .tb:nth-child(4){left:0;top:80px}
-#emoteWheel .tb:nth-child(5){left:98px;top:98px;width:40px;height:40px;font-size:16px;background:rgba(10,20,45,.8)}
+#emoteWheel .tb:nth-child(5){left:160px;top:160px;background:rgba(150,90,20,.9)}
+#emoteWheel .tb:nth-child(6){left:98px;top:98px;width:40px;height:40px;font-size:16px;background:rgba(10,20,45,.8)}
 body.land #emoteWheel .ring{transform:scale(.88)}
 
 /* overlays on small screens */
@@ -373,3 +374,20 @@ body.land #emoteWheel .ring{transform:scale(.88)}
 }
 @media (max-height:520px){#lobbyNav{height:46px}.ntab{font-size:16px;padding:5px 12px 3px}#promo{display:none}#modeCard{bottom:8px}#modeCard #playBtn{font-size:28px}.panel2{top:52px;bottom:8px;width:min(52vw,520px)}#lobbyBtns{bottom:8px}#lobbyLvl{bottom:8px}#nameTag{top:11%}.panel2 .ptitle{font-size:22px}}
 #lobby:not([data-tab=play]) #nameTag,#lobby:not([data-tab=play]) #promo,#lobby:not([data-tab=play]) .slotPlus{display:none!important}
+
+/* always-visible control pill: E is INTERACT (chest / loot / vehicle / bush), the mouse button is FIRE */
+#ctrlPill{position:absolute;left:50%;top:calc(62% + 52px);transform:translateX(-50%);display:flex;gap:4px 14px;font-size:12px;color:#fff;text-shadow:0 1px 2px #000;background:rgba(10,20,45,.55);padding:4px 12px;border-radius:5px;pointer-events:none;white-space:nowrap;opacity:.82}
+#ctrlPill kbd{background:#ffe36a;color:#222;padding:1px 6px;border-radius:3px;font-size:10.5px;font-weight:bold;margin-right:5px}
+#ctrlPill b{letter-spacing:1px}
+#ctrlPill.fade{opacity:.4}
+body.touch #ctrlPill{display:none}
+@media (max-width:760px){#ctrlPill{top:calc(62% + 46px);font-size:10.5px;gap:3px 8px;padding:3px 8px}}
+
+#emoteGrid,#emGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#emoteGrid button,#emGrid button{background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.35);color:#fff;font-family:Impact,sans-serif;letter-spacing:1.5px;font-size:15px;padding:12px 4px;cursor:pointer;position:relative;touch-action:manipulation}
+#emoteGrid button:hover,#emGrid button:hover,#emoteGrid button.sel{background:#ffe03a;color:#201400;border-color:#ffe03a}
+#emoteGrid button i,#emGrid button i{position:absolute;left:5px;top:2px;font-size:10px;font-style:normal;opacity:.7;font-family:Arial,sans-serif}
+#emoteStop{align-self:flex-start;margin-top:4px}
+#emoteMenu{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:rgba(8,24,52,.94);border:2px solid #fff;padding:12px 14px;width:min(92vw,460px);pointer-events:auto}
+#emoteMenu.hidden{display:none}
+#emoteMenu .emtitle{font-family:Impact,sans-serif;font-size:24px;letter-spacing:3px;margin-bottom:8px}#emoteMenu small{font-size:11px;letter-spacing:0;font-family:Arial,sans-serif;opacity:.8;margin-left:8px}

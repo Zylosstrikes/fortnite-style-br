@@ -16,6 +16,8 @@ if want('heals'): props.heals(out)
 if want('llama'): props.llama(out)
 if want('rigged'):
     import rig_anim; rig_anim.build_rigged_files(out)
+if want('anims'):
+    import rig_anim; rig_anim.build_anims_file(out)
 if want('trees'): props.trees(out)
 if want('scenery'): props2.build_scenery(out)
 if want('manor'): props2.build_manor(out)

@@ -192,6 +192,9 @@ function segGeos(skin) {
 }
 /* head parts were authored around the head pivot: bake the pivot offset only for the low LOD merge (done above); torso etc. are absolute. */
 const HOLD = { pistol: { z: -0.12, s: 1.25, mz: -0.36 }, dual: { z: -0.12, s: 1.3, mz: -0.36 }, shotgun: { z: -0.2, s: 1.05, mz: -0.98 }, ar: { z: -0.2, s: 1.0, mz: -1.2 }, smg: { z: -0.12, s: 1.1, mz: -0.72 }, sniper: { z: -0.05, s: 0.82, mz: -1.56 }, rocket: { z: 0.12, s: 0.85, mz: -1.28, f: 2 } };
+/* hand-grip points (weaponModel space, before HOLD.s): g = right-hand grip, f = left-hand fore-grip; ax = arm+forearm aim angle the holder cancels */
+const GRIP = { pistol: { g: [0, -0.12, 0.03], ax: 1.82 }, dual: { g: [0, -0.12, 0.03], ax: 1.82 }, shotgun: { g: [0, -0.1, 0.15], f: [0, -0.08, -0.5], ax: 2.08 }, ar: { g: [0, -0.18, 0.08], f: [0, -0.1, -0.62], ax: 2.25 }, smg: { g: [0, -0.2, 0.05], f: [0, -0.1, -0.35], ax: 2.25 }, sniper: { g: [0, -0.08, 0.3], f: [0, -0.05, -0.6], ax: 2.45 }, rocket: { g: [0, -0.1, -0.45], f: [0, -0.15, -0.95], ax: 2.5 } };
+G.GRIP = GRIP;
 G.makeCharacter = function (skin) {
   const E = segGeos(skin), GG = E.geos, O = E.O; const mat = G.vcMat; const PV = GG.piv || { shx: 0.46, hipx: 0.17 }; const om = GG.piv ? (G.outlineThin || (G.outlineThin = (() => { const m = G.outlineMat.clone(); m.uniforms.w.value = 0.012; return m; })())) : G.outlineMat;
   const root = new T.Group(), lean = new T.Group(), m = new T.Group(); lean.position.y = 1; m.position.y = -1; root.add(lean); lean.add(m);
@@ -210,15 +213,27 @@ G.makeCharacter = function (skin) {
   for (let k = 0; k < 3; k++) { const q = new T.Mesh(G.flashGeo || (G.flashGeo = new T.PlaneGeometry(0.5, 0.5)), fm); q.rotation.z = k * Math.PI / 3; flash.add(q); } const core = new T.Mesh(new T.SphereGeometry(0.09, 6, 5), new T.MeshBasicMaterial({ color: 0xffffff, fog: false })); flash.add(core); flash.visible = false; gun.add(flash);
   const glider = G.makeGlider(skin.shirt !== undefined ? skin.shirt : (O.packT === 'cape' || O.top === 0xeaf4ff || O.top === 0xf4f4f4 ? O.top2 : O.top)); glider.visible = false; root.add(glider);
   const o = { root, lean, m, legs, knees, arms, elbows, head, gun, pick, flash, glider, held: null, heldKey: '', hi, low, outlines, lod: 0, outfit: O };
+  // The held item lives in a "hand" holder parented to the right forearm (so it follows every animation).
+  // Its rotation cancels the forearm's aim-pose angle so the weapon points forward when aiming.
+  const hand = new T.Group(); hand.position.set(0, -0.36, 0); elbows[1].add(hand); hand.rotation.x = -2.25; hand.add(flash);
+  o.hand = hand; o.fore = null; o.held2 = null;
   o.setLOD = function (lv) { // 0 near+outline, 1 near, 2 far silhouette, 3 hidden
-    if (lv === o.lod) return; o.lod = lv; root.visible = lv < 3 ? o.wantVisible !== false : false; hi.visible = lv < 2; low.visible = lv === 2; for (const x of outlines) x.visible = lv === 0; gun.visible = lv < 2 || true;
+    if (lv === o.lod) return; o.lod = lv; root.visible = lv < 3 ? o.wantVisible !== false : false; hi.visible = lv < 2; low.visible = lv === 2; for (const x of outlines) x.visible = lv === 0; gun.visible = true;
+    if (o.held2) o.held2.visible = lv === 2;
   };
   o.setHeld = function (kind, w, rar) {
     const key = kind + (w || '') + (rar === undefined ? '' : rar); if (key === o.heldKey) return; o.heldKey = key;
-    if (o.held) { gun.remove(o.held); o.held = null; } pick.visible = kind === 'pickaxe'; flash.position.set(0, 0, -1.2);
-    if (kind === 'weapon') { const H = HOLD[w] || HOLD.ar, wm = G.weaponModel(w, G.RARITY[rar].hex); wm.position.set(0, -0.02, H.z); wm.scale.multiplyScalar(H.s); gun.add(wm); o.held = wm; flash.position.set(0, 0.04, H.z + H.mz * 1.15 * H.s); flash.scale.setScalar(H.f || 1); }
-    else if (kind === 'gadget') { const wm = G.gadgetModel(w); wm.position.set(0, -0.1, -0.25); wm.scale.setScalar(1.4); gun.add(wm); o.held = wm; }
-    o.hasGun = kind === 'weapon';
+    if (o.held) { hand.remove(o.held); o.held = null; } if (o.held2) { gun.remove(o.held2); o.held2 = null; } o.fore = null;
+    pick.visible = kind === 'pickaxe'; flash.position.set(0, 0, -1.2); flash.scale.setScalar(1);
+    if (kind === 'weapon') {
+      const H = HOLD[w] || HOLD.ar, GR = GRIP[w] || GRIP.ar, mk = () => G.weaponModel(w, G.RARITY[rar].hex);
+      const wm = mk(); wm.scale.multiplyScalar(H.s); wm.position.set(-GR.g[0] * H.s, -GR.g[1] * H.s, -GR.g[2] * H.s); hand.add(wm); o.held = wm;
+      hand.rotation.set(-GR.ax, GR.ay || 0, 0);
+      flash.position.set(wm.position.x, wm.position.y + 0.06, wm.position.z + H.mz * 1.15 * H.s); flash.scale.setScalar(H.f || 1);
+      if (GR.f) o.fore = new T.Vector3(GR.f[0] * H.s, GR.f[1] * H.s, GR.f[2] * H.s).add(wm.position); // left-hand grip, in the hand holder space
+      const w2 = mk(); w2.position.set(0, -0.02, H.z); w2.scale.multiplyScalar(H.s); w2.visible = o.lod === 2; gun.add(w2); o.held2 = w2; // far-LOD belt copy
+    } else if (kind === 'gadget') { const wm = G.gadgetModel(w); hand.rotation.set(-1.8, 0, 0); wm.position.set(0, 0.02, 0); wm.scale.setScalar(1.5); hand.add(wm); o.held = wm; }
+    o.hasGun = kind === 'weapon'; o.aimX = kind === 'weapon' ? (GRIP[w] || GRIP.ar).ax : 1.8;
   };
   o.setLOD(0); return o;
 };

@@ -288,8 +288,8 @@ W.addChest = function (x, y, z, yaw, bld, style, rar) {
   const c = { kind: 'chest', style, rar, x, y, z, yaw, opened: false, mesh: grp.userData.body, lid: grp.userData.lid, beam: grp.userData.beam, grp, bld };
   G.chests.push(c); return c;
 };
-W.openChest = function (c) {
-  if (c.opened || c.falling) return; c.opened = true; c.lid.rotation.x = -1.9; c.beam.visible = false; if (c.onOpen) c.onOpen(c);
+W.openChest = function (c, by) {
+  if (c.opened || c.falling) return; if (by && G.Anim) G.Anim.trigger(by, 'chest_open'); c.opened = true; c.lid.rotation.x = -1.9; c.beam.visible = false; if (c.onOpen) c.onOpen(c);
   for (const it of G.chestItems(c)) { const a = Math.random() * 6.28, r = G.rand(0.9, 1.9); G.addLoot(it, c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r, c.bld); }
 };
 

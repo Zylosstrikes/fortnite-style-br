@@ -69,7 +69,7 @@ G.useGadget = function (a, tx, ty, tz) {
   if (it.id === 'tnt') {
     const ox = a.x + fx * 0.6, oy = a.y + 1.55, oz = a.z + fz * 0.6; let dx = tx - ox, dy = ty - oy, dz = tz - oz; const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl; const sp = G.clamp(dl * 0.9 + 6, 10, 21);
     const mesh = G.makeBombMesh(); mesh.scale.setScalar(2.2); G.scene.add(mesh); G.bombs.push({ x: ox, y: oy, z: oz, vx: dx * sp + a.vx * 0.4, vy: dy * sp + 4.5, vz: dz * sp + a.vz * 0.4, t: 0, fuse: gd.fuse, owner: a, mesh, rest: false });
-    a.fireCD = 0.7; G.Audio.at('jump', a.x, a.y, a.z, 0.5); a.lastShotT = G.time;
+    a.fireCD = 0.7; G.Audio.at('jump', a.x, a.y, a.z, 0.5); a.lastShotT = G.time; if (G.Anim) G.Anim.trigger(a, 'throw');
   } else {
     const px = a.x + fx * 2.4, pz = a.z + fz * 2.4; const gy = W().groundY(px, pz, a.y + 1.0, 1.0); if (Math.abs(gy - a.y) > 1.3) { if (a.isPlayer) G.hook('msg', 'Can\'t place a trap here'); return false; }
     if (G.traps.some(t => Math.hypot(t.x - px, t.z - pz) < 2.4)) { if (a.isPlayer) G.hook('msg', 'Trap too close to another'); return false; }

@@ -86,17 +86,13 @@ function pvInit() {
   el.addEventListener('pointerdown', dn); el.addEventListener('pointermove', e => { if (PV.drag === e.pointerId) { PV.yaw += (e.clientX - PV.lx) * 0.012; PV.lx = e.clientX; PV.spin = 6; } });
   const up = e => { if (PV.drag === e.pointerId) PV.drag = false; }; el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   G.pvRefresh = pvRefresh;
-  G.pvYaw = () => PV.yaw; G.lobbyEmote = function (name) { PV.emote = { name, t: 0 }; };
+  G.pvYaw = () => PV.yaw; G.pvRig = () => PV.rig; G.pvSetYaw = y => { PV.yaw = y; PV.spin = 99; }; G.lobbyEmote = function (name) { PV.emote = { name, t: 0 }; if (G.Anim) G.Anim.lobbyPlay(name); };
 }
 function pvRefresh() {
   const sk = playerSkin(), U = UI(), key = [sk.outfit, sk.tone, sk.shirt, sk.acc, sk.pick].join('|'); if (key === PV.key || !PV.scene) return; PV.key = key;
   if (PV.rig) PV.scene.remove(PV.rig.root); PV.rig = G.makeCharacter(sk); PV.rig.setHeld('pickaxe'); PV.rig.setLOD(0); PV.scene.add(PV.rig.root);
 }
-function pvRender(dt) {
-  if (!PV.scene) return; pvRefresh(); if (!PV.rig) return; G.Lobby.update(dt);
-  const W = innerWidth, H = innerHeight, asp = W / H, port = asp < 0.9;
-  PV.t += dt; PV.spin = Math.max(0, PV.spin - dt); if (!PV.drag && PV.spin <= 0) PV.yaw += (0.35 - PV.yaw) * Math.min(1, dt * 0.6);
-  const rg = PV.rig, t = PV.t, ph = t * 1.6; rg.root.rotation.y = PV.yaw; rg.m.position.y = -1 + Math.sin(ph) * 0.012; rg.lean.rotation.set(Math.sin(ph) * 0.012, 0, 0); rg.lean.position.y = 1;
+function legacyLobby(rg, t, ph, dt) {
   const A = rg.arms, E = rg.elbows, Lg = rg.legs, K = rg.knees; A[0].rotation.set(0.05 + Math.sin(ph) * 0.03, 0, 0.06); E[0].rotation.set(0.25, 0, 0); A[1].rotation.set(0.5, 0, -0.1); E[1].rotation.set(0.6, 0, 0);
   Lg[0].rotation.set(0, 0, 0); Lg[1].rotation.set(0, 0, 0); K[0].rotation.set(0, 0, 0); K[1].rotation.set(0, 0, 0); rg.head.rotation.set(0, Math.sin(t * 0.7) * 0.2, 0); rg.pick.visible = !PV.emote;
   if (PV.emote) { PV.emote.t += dt; const e = PV.emote, et = e.t, nm = e.name; rg.head.rotation.set(0, 0, 0);
@@ -105,6 +101,13 @@ function pvRender(dt) {
     else if (nm === 'flex') { A[0].rotation.set(0.2, 0, 2.2 + Math.sin(et * 6) * 0.1); A[1].rotation.set(0.2, 0, -2.2 - Math.sin(et * 6) * 0.1); E[0].rotation.x = E[1].rotation.x = 1.6; rg.m.position.y = -1 + Math.abs(Math.sin(et * 6)) * 0.04; }
     else { rg.lean.rotation.y = et * 9; A[0].rotation.set(2.2, 0, 0.9); A[1].rotation.set(2.2, 0, -0.9); rg.m.position.y = -1 + Math.max(0, Math.sin(et * 5)) * 0.3; }
     if (et > (nm === 'spin' ? 1.4 : 3.4)) { PV.emote = null; rg.lean.rotation.y = 0; } } else rg.lean.rotation.y = 0;
+}
+function pvRender(dt) {
+  if (!PV.scene) return; pvRefresh(); if (!PV.rig) return; G.Lobby.update(dt);
+  const W = innerWidth, H = innerHeight, asp = W / H, port = asp < 0.9;
+  PV.t += dt; PV.spin = Math.max(0, PV.spin - dt); if (!PV.drag && PV.spin <= 0) PV.yaw += (0.35 - PV.yaw) * Math.min(1, dt * 0.6);
+  const rg = PV.rig, t = PV.t, ph = t * 1.6; rg.root.rotation.y = PV.yaw; rg.m.position.y = -1 + Math.sin(ph) * 0.012; rg.lean.rotation.set(Math.sin(ph) * 0.012, 0, 0); rg.lean.position.y = 1;
+  if (!(G.Anim && G.Anim.updateLobby(rg, dt))) legacyLobby(rg, t, ph, dt);   // clips (mixer) first; the original procedural idle/emotes are the fallback
   const c = PV.cam, dist = Math.max(6.7, 1.2 / (Math.tan(15 * Math.PI / 180) * asp));
   const want = (G.LobbyUI && G.LobbyUI.tab() !== 'play' && !port) ? 0.2 : 0; PV.shift += (want - PV.shift) * Math.min(1, dt * 6);
   c.aspect = asp; c.setViewOffset(W, H, PV.shift * W, port ? -H * 0.04 : 0, W, H); c.position.set(0, 1.55, -dist); c.lookAt(0, port ? 1.2 : 1.05, 0); c.updateProjectionMatrix();
@@ -145,7 +148,7 @@ function endGame(win) {
 }
 function winnerCheck() {
   const pl = G.player; if (!pl || state.matchOver) return; const alive = G.aliveCount();
-  if (pl.alive && alive === 1 && G.time > 12) { state.matchOver = true; setTimeout(() => endGame(true), 1200); }
+  if (pl.alive && alive === 1 && G.time > 12) { state.matchOver = true; pl.victory = true; pl.emote = null; setTimeout(() => endGame(true), 2400); }
   else if (!pl.alive && !state.ended && G.time - state.deathTime > 2.0) endGame(false);
   else if (!pl.alive && alive <= 1 && state.ended === 'spectating') { state.matchOver = true; const w = G.actors.find(a => a.alive); G.UI.toast((w ? w.name : 'Nobody') + ' wins the match!', 4000); setTimeout(() => { state.ended = true; G.UI.showEnd(false, pl, state.killer && state.killer.name, false); $('endSub').textContent = 'Winner: ' + (w ? w.name : 'nobody') + ' • you placed #' + pl.stats.placement; }, 3500); }
 }
@@ -175,6 +178,13 @@ function toggleHelp(force) {
   const open = force !== undefined ? force : !state.helpOpen; state.helpOpen = open; $('help').classList.toggle('hidden', !open);
   if (state.phase === 'playing') { state.paused = open || state.paused && !open && !NOLOCK && document.pointerLockElement !== $('c'); if (open && document.exitPointerLock) document.exitPointerLock(); if (!open) { state.paused = false; lock(); } }
 }
+let emOpen = false; const EMN = () => (G.Anim && G.Anim.emotes) || ['dance', 'wave', 'flex', 'spin'];
+function openEmoteMenu(on) {
+  const m = $('emoteMenu'); if (!m) return; if (on && (state.phase !== 'playing' || !G.player.alive || G.player.state !== 'ground' || G.player.vehicle)) return; emOpen = on; m.classList.toggle('hidden', !on);
+  if (on) { keys.KeyW = keys.KeyA = keys.KeyS = keys.KeyD = false; mouse.l = false; if (document.exitPointerLock) document.exitPointerLock(); const g = $('emGrid'); if (!g.children.length) EMN().forEach((n, i) => { const b = document.createElement('button'); b.innerHTML = '<i>' + (i < 10 ? (i + 1) % 10 : '') + '</i>' + ((G.Anim && G.Anim.labels[n]) || n.toUpperCase()); b.onclick = () => { act.emote(n); openEmoteMenu(false); }; g.appendChild(b); }); }
+  else if (!G.touchOn && state.phase === 'playing') lock();
+}
+G.openEmoteMenu = openEmoteMenu;
 function bindInput() {
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') { if (e.code === 'Enter') startMatch(); return; }
@@ -184,7 +194,9 @@ function bindInput() {
     if (e.code === 'KeyH') { toggleHelp(); return; } if (e.code === 'KeyN') { const m = G.Audio.toggleMute(); G.UI.toast(m ? 'Sound off' : 'Sound on', 800, true); return; }
     if (state.phase !== 'playing') return; if (e.code === 'KeyM') { act.map(); return; } if (state.paused || state.ended === true && !G.player.alive && false) return;
     if (!G.player.alive) return;
+    if (emOpen) { if (e.code === 'KeyB' || e.code === 'Escape') openEmoteMenu(false); else if (/^Digit[0-9]$/.test(e.code)) { const n = EMN()[(+e.code[5] + 9) % 10]; if (n) { act.emote(n); openEmoteMenu(false); } } return; }
     switch (e.code) {
+      case 'KeyB': openEmoteMenu(true); break;
       case 'Space': act.jump(); break; case 'KeyE': act.interact(); break; case 'KeyR': act.reload(); break;
       case 'KeyQ': act.build('wall'); break; case 'KeyF': act.build('floor'); break; case 'KeyZ': act.build('ramp'); break; case 'KeyC': act.build('roof'); break;
       case 'KeyG': act.mat(); break; case 'KeyX': act.edit(); break;
@@ -336,7 +348,7 @@ function initTouch() {
   /* ---- emote wheel: one button opens it ---- */
   const ew = document.createElement('div'); ew.id = 'emoteWheel'; ew.className = 'hidden';
   ew.innerHTML = '<div class="ring"></div>'; t.appendChild(ew); const ring = ew.firstChild;
-  for (const [n, l] of [['dance', 'DANCE'], ['spin', 'SPIN'], ['flex', 'FLEX'], ['wave', 'WAVE']]) { const b = document.createElement('div'); b.className = 'tb'; b.textContent = l; ring.appendChild(b); bindPtr(b, { down: () => { act.emote(n); openEmotes(false); } }); }
+  for (const [n, l] of [['dance', 'DANCE'], ['spin', 'SPIN'], ['flex', 'FLEX'], ['wave', 'WAVE'], ['more', 'MORE ▸']]) { const b = document.createElement('div'); b.className = 'tb'; b.textContent = l; ring.appendChild(b); bindPtr(b, { down: () => { if (n === 'more') { openEmotes(false); openEmoteMenu(true); } else { act.emote(n); openEmotes(false); } } }); }
   const x = document.createElement('div'); x.className = 'tb'; x.textContent = '✕'; ring.appendChild(x); bindPtr(x, { down: () => openEmotes(false) });
   ew.addEventListener('pointerdown', e => { if (e.target === ew) openEmotes(false); });
   G.openEmotes = openEmotes;
@@ -363,19 +375,24 @@ function touchUpdate() {
 G.touchUpdate = touchUpdate;
 
 /* ================= interaction ================= */
-let promptT = 0, promptTarget = null;
+let promptT = 0, promptTarget = null, pillTxt = '';
+function updatePill() { // label of the primary-mouse action for the current item (E is always interact)
+  const a = G.player, e = $('cpFire'); if (!a || !e) return; const it = a.inv && a.inv[a.sel];
+  const t = a.buildMode ? 'PLACE' : !it ? 'FIRE' : it.type === 'pickaxe' ? 'SWING / HARVEST' : it.type === 'weapon' ? 'FIRE' : it.type === 'gadget' ? 'THROW / USE' : 'USE'; if (t !== pillTxt) { pillTxt = t; e.lastChild.textContent = t; }
+  const cp = $('ctrlPill'); const on = !state.mapOpen && a.alive && a.state === 'ground' && !a.vehicle; if (cp.style.display !== (on ? '' : 'none')) cp.style.display = on ? '' : 'none';
+}
 function findInteract() {
   const a = G.player; if (!a.alive || a.state !== 'ground') return null; if (a.vehicle) return { kind: 'exit', text: 'Exit vehicle' };
   let best = null, bd = 99;
-  const c = G.nearestChest(a, 2.8); if (c) { const d = Math.hypot(c.x - a.x, c.z - a.z); best = { kind: 'chest', o: c, text: c.kind === 'llama' ? 'Smash Supply Llama' : c.kind === 'truck' ? 'Open Armored Truck' : 'Open ' + (c.style === 'metal' ? 'Blue Metal' : 'Wooden') + ' Chest (' + G.RARITY[c.rar].name + ')', color: G.RARITY[c.rar].color }; bd = d; }
-  const l = G.nearestLoot(a, 2.8); if (l) { const d = Math.hypot(l.x - a.x, l.z - a.z); if (d < bd) { bd = d; best = { kind: 'loot', o: l, text: 'Pick up ' + G.itemName(l.item), color: G.RARITY[l.item.rarity !== undefined ? l.item.rarity : 0].color }; } }
+  const c = G.nearestChest(a, 3.4); if (c) { const d = Math.hypot(c.x - a.x, c.z - a.z); best = { kind: 'chest', o: c, text: c.kind === 'llama' ? 'Smash Supply Llama' : c.kind === 'truck' ? 'Open Armored Truck' : 'Open ' + (c.style === 'metal' ? 'Blue Metal' : 'Wooden') + ' Chest (' + G.RARITY[c.rar].name + ')', color: G.RARITY[c.rar].color }; bd = d; }
+  const l = G.nearestLoot(a, 3.2); if (l) { const d = Math.hypot(l.x - a.x, l.z - a.z); if (d < bd) { bd = d; best = { kind: 'loot', o: l, text: 'Pick up ' + G.itemName(l.item), color: G.RARITY[l.item.rarity !== undefined ? l.item.rarity : 0].color }; } }
   const v = G.nearestVehicle(a, 3.4); if (v) { const d = Math.hypot(v.x - a.x, v.z - a.z); if (d < bd) { bd = d; best = { kind: 'veh', o: v, text: 'Drive Buggy' }; } }
   if (!best && G.Extras) { const b = a.hideLock ? a.hideLock : G.Extras.nearestBush(a, 3.4); if (b && (a.hideLock || Math.hypot(b.x - a.x, b.z - a.z) > b.r * 0.6)) best = { kind: 'bush', o: b, text: a.hideLock ? 'Leave bush' : 'Hide in bush' }; }
   return best;
 }
 function interact() {
-  const a = G.player; if (!a.alive || state.paused) return; const t = findInteract(); if (!t) return;
-  if (t.kind === 'exit') G.exitVehicle(a); else if (t.kind === 'chest') { G.World.openChest(t.o); G.Audio.play('chest'); } else if (t.kind === 'loot') G.pickupLoot(a, t.o); else if (t.kind === 'veh') G.enterVehicle(a, t.o); else if (t.kind === 'bush') { if (a.hideLock) { const b = a.hideLock; a.hideLock = null; a.x = b.x - Math.sin(a.yaw) * (b.r + 1.4); a.z = b.z - Math.cos(a.yaw) * (b.r + 1.4); } else { G.Extras.enterBush(a, t.o); G.UI.toast('Hidden in the bush', 900, true); } }
+  const a = G.player; if (!a.alive || state.paused) return; const t = findInteract(); if (!t) { if (a.state === 'ground' && !a.vehicle) G.UI.toast('Nothing to use here · E = chest / loot / vehicle / bush · FIRE = Left Click', 1700, true); return; }
+  if (t.kind === 'exit') G.exitVehicle(a); else if (t.kind === 'chest') { G.World.openChest(t.o, a); G.Audio.play('chest'); } else if (t.kind === 'loot') G.pickupLoot(a, t.o); else if (t.kind === 'veh') G.enterVehicle(a, t.o); else if (t.kind === 'bush') { if (a.hideLock) { const b = a.hideLock; a.hideLock = null; a.x = b.x - Math.sin(a.yaw) * (b.r + 1.4); a.z = b.z - Math.cos(a.yaw) * (b.r + 1.4); } else { G.Extras.enterBush(a, t.o); G.UI.toast('Hidden in the bush', 900, true); } }
 }
 
 /* ================= loot visuals / culling ================= */
@@ -395,7 +412,7 @@ function updateLootViz(dt) {
 function updateCull(dt) {
   cullT -= dt; if (cullT > 0) return; cullT = 0.3; const cx = camera.position.x, cz = camera.position.z;
   for (const c of G.chests) { const d = Math.hypot(c.x - cx, c.z - cz); c.grp.visible = !c.gone && d < 380; c.mesh.visible = c.lid.visible = d < 130; }
-  for (const a of G.actors) { if (!a.alive || a === G.view && a.isPlayer) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < G.cullFar * 0.6 && !(a.hidden && d > 9); a.rig.setLOD(d < G.outlineDist ? 0 : d < [26, 36, 48][G.Q.level] ? 1 : 2); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
+  for (const a of G.actors) { if (a === G.view && a.isPlayer) { a.rig.setLOD(a.state === 'bus' ? 3 : 0); continue; } if (!a.alive) continue; if (a.state === 'bus') continue; const d = Math.hypot(a.x - cx, a.z - cz); a.rig.root.visible = d < G.cullFar * 0.6 && !(a.hidden && d > 9); a.rig.setLOD(d < G.outlineDist ? 0 : d < [44, 60, 80][G.Q.level] ? 1 : 2); if (a.plate) a.plate.visible = d < 32 && a.alive && !a.hidden; }
 }
 
 /* ================= camera ================= */
@@ -485,7 +502,7 @@ function simStep(dt) {
   const p = G.player; $('busHint').style.display = p.state === 'bus' && p.alive ? 'block' : 'none';
   const ah = $('airHint'); if (p.state === 'freefall') { ah.style.display = 'block'; ah.innerHTML = G.touchOn ? 'Free-falling — stick forward to dive • tap <b>GLIDE</b> (auto at low altitude)' : 'Free-falling — <b>W</b> dive • <b>SPACE</b> deploy glider (auto at low altitude)'; } else if (p.state === 'glide') { ah.style.display = 'block'; ah.innerHTML = 'Gliding — steer to land near buildings & loot'; } else ah.style.display = 'none';
   if (G.waypoint && Math.hypot(p.x - G.waypoint.x, p.z - G.waypoint.z) < 8) G.waypoint = null;
-  promptT -= dt; if (promptT <= 0) { promptT = 0.08; promptTarget = findInteract(); const pe = $('prompt'); if (promptTarget && !state.mapOpen) { pe.style.display = 'block'; pe.innerHTML = '<kbd>E</kbd>' + promptTarget.text; pe.style.borderColor = promptTarget.color || '#fff'; } else pe.style.display = 'none'; }
+  promptT -= dt; if (promptT <= 0) { promptT = 0.08; promptTarget = findInteract(); updatePill(); const pe = $('prompt'); if (promptTarget && !state.mapOpen) { pe.style.display = 'block'; pe.innerHTML = '<kbd>E</kbd>' + promptTarget.text; pe.style.borderColor = promptTarget.color || '#fff'; } else pe.style.display = 'none'; }
 }
 G.simStep = simStep;
 
@@ -509,7 +526,7 @@ G.debug = {
   warpBus(t) { const b = G.bus; if (b.active) { b.x += b.vx * t; b.z += b.vz * t; b.t += t; } },
   look(y, p) { yaw = y; pitch = p; },
   cull() { cullT = 0; updateCull(0.01); G.World.cullTrees(camera, G.cullFar); },
-  state, mouse,
+  state, mouse, keys,
 };
 
 /* ================= boot ================= */
@@ -520,5 +537,5 @@ const boot = () => {
   requestAnimationFrame(frame);
   if (Q.has('autostart') || sessionStorage.getItem('sf_auto')) { sessionStorage.removeItem('sf_auto'); setTimeout(() => startMatch(), 200); }
 };
-setTimeout(() => { const lm = $('loadMsg'); if (lm && G.Assets && G.Assets.enabled) lm.textContent = 'Loading models…'; Promise.all([G.Assets ? G.Assets.load() : Promise.resolve(), G.Clips ? G.Clips.load('assets/models/rigged/rigged_default.glb') : Promise.resolve()]).then(boot, boot); }, 60);
+setTimeout(() => { const lm = $('loadMsg'); if (lm && G.Assets && G.Assets.enabled) lm.textContent = 'Loading models…'; Promise.all([G.Assets ? G.Assets.load() : Promise.resolve(), G.Clips ? G.Clips.load('assets/models/rigged/anims.glb') : Promise.resolve()]).then(boot, boot); }, 60);
 })();
