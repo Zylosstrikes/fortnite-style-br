@@ -417,7 +417,7 @@ function updateCull(dt) {
 
 /* ================= camera ================= */
 function camDir() { const cp = Math.cos(pitch); return { x: -Math.sin(yaw) * cp, y: Math.sin(pitch), z: -Math.cos(yaw) * cp }; }
-let camPos = new T.Vector3(); const aim = { x: 0, y: 0, z: 0 };
+let camPos = new T.Vector3(); const aim = { x: 0, y: 0, z: 0 }; const camFX = { k: 0, ph: 0, kick: 0, was: false };
 function updateCamera(dt) {
   const v = G.view; let fovT = 72;
   if (state.phase === 'lobby') {
@@ -438,8 +438,13 @@ function updateCamera(dt) {
       camPos.set(head.x + dx / len * t, head.y + dy / len * t, head.z + dz / len * t); const gh = G.World.heightAt(camPos.x, camPos.z) + 0.45; if (camPos.y < gh) camPos.y = gh;
     }
     const sh = G.FX.shake * 0.35; camera.position.set(camPos.x + (Math.random() - 0.5) * sh, camPos.y + (Math.random() - 0.5) * sh, camPos.z + (Math.random() - 0.5) * sh);
-    const rc = w.recoil || 0; camera.rotation.set(pitch + (w === p ? rc * 0.6 : 0), yaw, 0);
-    fovT = G.scoped ? it && G.WEAPONS[it.w].zoom : ads ? 56 : (w.state === 'freefall' ? 85 : w.input.sprint && w.speedNow > 6 ? 77 : 72);
+    // sprint: footfall-synced camera bob / sway / roll + a quick FOV kick when the sprint starts
+    const sprinting = w === p && w.state === 'ground' && w.onGround && !w.vehicle && w.input.sprint && w.speedNow > 6 && !ads && !G.scoped;
+    camFX.k += ((sprinting ? 1 : 0) - camFX.k) * Math.min(1, dt * 6); camFX.ph += dt * (w.speedNow || 0) * 1.9;
+    if (sprinting && !camFX.was) camFX.kick = 1; camFX.was = sprinting; camFX.kick = Math.max(0, camFX.kick - dt * 3);
+    if (camFX.k > 0.01) { const k = camFX.k, sw = Math.sin(camFX.ph) * 0.035 * k; camera.position.y += (Math.abs(Math.cos(camFX.ph)) - 0.5) * 0.07 * k; camera.position.x += Math.cos(yaw) * sw; camera.position.z -= Math.sin(yaw) * sw; }
+    const rc = w.recoil || 0; camera.rotation.set(pitch + (w === p ? rc * 0.6 : 0), yaw, Math.sin(camFX.ph) * 0.01 * camFX.k);
+    fovT = G.scoped ? it && G.WEAPONS[it.w].zoom : ads ? 56 : (w.state === 'freefall' ? 85 : w.input.sprint && w.speedNow > 6 ? 77 + 7 * camFX.kick : 72);
     // aim point
     const dd = camDir(); const rr = G.World.raycast(camera.position.x, camera.position.y, camera.position.z, dd.x, dd.y, dd.z, 400); if (rr.hit) { aim.x = rr.x; aim.y = rr.y; aim.z = rr.z; } else { aim.x = camera.position.x + dd.x * 300; aim.y = camera.position.y + dd.y * 300; aim.z = camera.position.z + dd.z * 300; }
     // hide player model when scoped

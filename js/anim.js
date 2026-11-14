@@ -1,6 +1,6 @@
 'use strict';
 /* Character animation system.
-   Clips: 51 clips authored in Blender on the shared human armature (blender/anims.py -> blender/rig_anim.py -> assets/models/rigged/anims.glb).
+   Clips: 60 clips authored in Blender on the shared human armature (blender/anims.py -> blender/rig_anim.py -> assets/models/rigged/anims.glb).
    They are sampled once through THREE.AnimationMixer on the exported armature, converted to the game's segment-rig joint rotations and
    re-built as AnimationClips for the game rig ('<clip>.lo' = legs + hip translation, '<clip>.up' = torso, head, arms).  Every character gets its own
    AnimationMixer; two independent layers (lower / upper body) are cross-faded (mixer action weights) so e.g. run legs + rifle arms + a shot overlay work together.
@@ -13,7 +13,10 @@ const A = G.Anim = { force: Q.get('anim') || null, legacy: Q.has('legacyanim'), 
 const D = () => (G.AnimData && G.AnimData.clips) || {};
 const FPS = 30;
 A.emotes = (G.AnimData && G.AnimData.emotes) || ['dance', 'wave', 'flex', 'spin'];
-A.labels = { dance: 'DANCE', wave: 'WAVE', flex: 'FLEX', spin: 'SPIN', clap: 'CLAP', cheer: 'CHEER', salute: 'SALUTE', bow: 'BOW', shrug: 'SHRUG', robot: 'ROBOT', jacks: 'JACKS', boxing: 'BOXING' };
+const META = (G.AnimData && G.AnimData.meta) || {};
+A.labels = Object.assign({ dance: 'DANCE', wave: 'WAVE', flex: 'FLEX', spin: 'SPIN', clap: 'CLAP', cheer: 'CHEER', salute: 'SALUTE', bow: 'BOW', shrug: 'SHRUG', robot: 'ROBOT', jacks: 'JACKS', boxing: 'BOXING' }, META.labels || {});
+A.flips = META.flips || {};
+const easeFade = f => f * f * (3 - 2 * f);   // smoothstep cross-fade weights (no linear 'pop' at either end)
 A.names = () => Object.keys(D()).length ? Object.keys(D()) : Object.keys(C.durs || {});
 const info = n => { const d = D()[n]; if (d) return { dur: d.d, loop: !!d.l, lin: !!d.lin }; const x = C.durs && C.durs[n]; return x || null; };
 A.info = info;
@@ -78,7 +81,7 @@ function sampleData(name, t, out) {
 const PA = {}, PB = {}, PL = {}, PU = {};
 function blendPose(g, out) {   // out = blended pose of the group's current (+ fading previous) clip
   const c = g.cur; sampleData(c.name, c.time, PA);
-  if (g.prev && g.fade < 1) { sampleData(g.prev.name, g.prev.time, PB); const k = g.fade; for (const j in PA) { const a = PA[j], b = PB[j], o = out[j] || (out[j] = [0, 0, 0]); for (let q = 0; q < 3; q++) o[q] = b[q] + (a[q] - b[q]) * k; } }
+  if (g.prev && g.fade < 1) { sampleData(g.prev.name, g.prev.time, PB); const k = easeFade(g.fade); for (const j in PA) { const a = PA[j], b = PB[j], o = out[j] || (out[j] = [0, 0, 0]); for (let q = 0; q < 3; q++) o[q] = b[q] + (a[q] - b[q]) * k; } }
   else for (const j in PA) { const o = out[j] || (out[j] = [0, 0, 0]); o[0] = PA[j][0]; o[1] = PA[j][1]; o[2] = PA[j][2]; }
   return out;
 }
@@ -127,7 +130,7 @@ class Ctl {
     for (const L of ['lo', 'up']) {
       const g = this.g[L], want = new Set();
       const put = (c, w) => { if (!c) return; const a = this.act(c.name, L); if (!a) return; a.setEffectiveWeight(w); a.timeScale = 0; a.time = Math.min(c.time, c.dur - 1e-4); if (!g.acts.has(a)) { a.play(); a.setEffectiveWeight(w); a.time = Math.min(c.time, c.dur - 1e-4); } want.add(a); };
-      put(g.cur, g.prev ? Math.max(0.0001, g.fade) : 1); if (g.prev) put(g.prev, Math.max(0.0001, 1 - g.fade));
+      const fk = easeFade(Math.min(1, g.fade)); put(g.cur, g.prev ? Math.max(0.0001, fk) : 1); if (g.prev) put(g.prev, Math.max(0.0001, 1 - fk));
       for (const a of g.acts) if (!want.has(a)) a.stop(); g.acts = want;
     }
     this.mixer.update(0);
@@ -158,11 +161,13 @@ const addX = (node, ang) => { node.quaternion.premultiply(QP.setFromAxisAngle(AX
 
 /* ---------------------------------------------------------------- game state -> clips */
 const WK = { pistol: 'pistol', dual: 'pistol', smg: 'rifle', ar: 'rifle', shotgun: 'shotgun', sniper: 'sniper', rocket: 'rocket' };
-const CYC = { walk: 2.4, run: 3.4, sprint: 4.4, back: 2.4, strafe_R: 2.2, strafe_L: 2.2 };
-const PRIO = { hit: 3, throw: 2, shoot_pistol: 2, shoot_rifle: 2, shoot_shotgun: 2, shoot_sniper: 2, shoot_rocket: 2, chest_open: 1, equip: 1, build_place: 1 };
+/* metres travelled per locomotion cycle = the planted foot's back-sweep (blender/anims.py stride()); playback rate = speed / stride keeps feet planted */
+const CYC = Object.assign({ walk: 2.4, run: 3.4, sprint: 4.4, back: 2.4, strafe_R: 2.2, strafe_L: 2.2 }, META.stride || {});
+const PRIO = { hit: 3, throw: 2, shoot_pistol: 2, shoot_rifle: 2, shoot_shotgun: 2, shoot_sniper: 2, shoot_rocket: 2, chest_open: 1, equip: 1, build_place: 1, build_place_L: 1 };
 const DRINK = { chug: 1, slurp: 1, shield: 1, minishield: 1 };
 A.weaponKind = it => it ? (it.type === 'gadget' ? 'pistol' : WK[it.w] || 'rifle') : 'rifle';
 A.trigger = function (a, name, o) {
+  if (name === 'build_place' && a && info('build_place_L')) { a._slapL = !a._slapL; if (a._slapL) name = 'build_place_L'; }   // alternate slapping hands
   if (!a || !a.alive || !info(name)) return; const prio = PRIO[name] || 1, os = a.os; if (os && os.t < os.dur && os.prio > prio) return;
   a.os = { name, t: 0, dur: (o && o.dur) || info(name).dur, prio, id: (os ? os.id : 0) + 1 };
 };
@@ -189,7 +194,7 @@ function resolve(a, c, dt) {
       c.airT += dt; if (c.air === 'jump' && c.airT > 0.7 && a.vy < -3) c.air = 'fall';
       lo = c.air; up = lo; lo_o.fade = up_o.fade = 0.12;
     } else {
-      if (c.wasAir) { c.wasAir = false; if (c.airT > 0.25) c.landT = 0.5; }
+      if (c.wasAir) { c.wasAir = false; if (c.airT > 0.25) { c.landT = 0.55; if (a.isPlayer && G.FX && c.airT > 0.6) G.FX.shake = Math.max(G.FX.shake || 0, Math.min(0.6, c.airT * 0.25)); } }
       if (c.landT > 0) { c.landT -= dt; lo = 'land'; lo_o.fade = 0.06; }
       else {
         let want; const wM = c.loco === 'run' ? 4.2 : 4.9, rM = c.loco === 'sprint' ? 6.6 : 7.3;
@@ -237,6 +242,41 @@ function leftIK(a, r, w) {
   IK.d2.copy(S).addScaledVector(dv, d).sub(IK.E).normalize().applyQuaternion(QP.copy(IK.q1).invert()); IK.q2.setFromUnitVectors(IK.dn, IK.d2);
   r.arms[0].quaternion.slerp(IK.q1, w); r.elbows[0].quaternion.slerp(IK.q2, w);
 }
+/* ---------------------------------------------------------------- secondary motion (backpack / hoodie drawstrings / hair) + reload weapon flip
+   Damped springs driven by the rig's hip acceleration and torso tilt.  The parts are split out of the character meshes in assets.js
+   (rig.sec, built in models3.js); rigs without them (procedural fallback models) simply skip this. */
+const SE = new T.Euler(), SUB = 1 / 90;
+function spr(s, target, K, D, F, h) { s.v += (K * (target - s.x) - D * s.v + F) * h; s.x += s.v * h; }
+function secondary(r, dt, px, py, pz, yaw) {
+  const S = r.sec; if (!S || r.lod > 1 || !(dt > 0)) return;
+  const h = Math.min(dt, 0.05); let st = S.st;
+  if (!st) st = S.st = { p: [px, py, pz], v: [0, 0, 0], a: [0, 0, 0], pit: 0, pitV: 0, pitA: 0, pack: { x: 0, v: 0 }, lx: { x: 0, v: 0 }, lz: { x: 0, v: 0 }, rx: { x: 0, v: 0 }, rz: { x: 0, v: 0 }, hair: { x: 0, v: 0 } };
+  const vx = (px - st.p[0]) / h, vy = (py - st.p[1]) / h, vz = (pz - st.p[2]) / h; st.p[0] = px; st.p[1] = py; st.p[2] = pz;
+  if (Math.abs(vx) + Math.abs(vy) + Math.abs(vz) > 70) { st.v[0] = st.v[1] = st.v[2] = 0; return; }      // teleport / bus drop: no impulse
+  const lp = Math.min(1, h * 30), A3 = [(vx - st.v[0]) / h, (vy - st.v[1]) / h, (vz - st.v[2]) / h]; st.v[0] = vx; st.v[1] = vy; st.v[2] = vz;
+  for (let i = 0; i < 3; i++) st.a[i] += (Math.max(-160, Math.min(160, A3[i])) - st.a[i]) * lp;
+  const sy = Math.sin(yaw), cy = Math.cos(yaw), afw = -st.a[0] * sy - st.a[2] * cy, alat = st.a[0] * cy - st.a[2] * sy, ay = st.a[1], sp = Math.hypot(vx, vz);
+  SE.setFromQuaternion(r.lean.quaternion, 'YXZ'); const pit = SE.x, roll = SE.z; const pv = (pit - st.pit) / h; st.pitA += ((pv - st.pitV) / h - st.pitA) * lp; st.pit = pit; st.pitV = pv;
+  const n = Math.max(1, Math.ceil(h / SUB)), hh = h / n;
+  for (let i = 0; i < n; i++) {
+    if (S.pack) { const P_ = st.pack; spr(P_, -0.08 * Math.min(1, sp / 7), 160, 8, 1.2 * ay - 1.0 * afw - 0.2 * st.pitA, hh); if (P_.x > 0.04) { P_.x = 0.04; P_.v = -0.35 * P_.v; } if (P_.x < -0.4) { P_.x = -0.4; P_.v *= -0.2; } }
+    if (S.cordL || S.cordR) { const tx = Math.max(0, -pit) * 0.9, tz = -roll;
+      spr(st.lx, tx, 60, 3, -2.5 * afw - 0.6 * ay, hh); spr(st.lz, tz, 60, 3, -2.5 * alat, hh); spr(st.rx, tx, 72, 3.4, -2.5 * afw - 0.6 * ay, hh); spr(st.rz, tz, 72, 3.4, -2.5 * alat, hh);
+      for (const q of [st.lx, st.rx]) { if (q.x < -0.05) { q.x = -0.05; q.v = -0.3 * q.v; } if (q.x > 1.3) { q.x = 1.3; q.v = 0; } } for (const q of [st.lz, st.rz]) q.x = Math.max(-0.9, Math.min(0.9, q.x)); }
+    if (S.hair) { spr(st.hair, 0, 220, 9, -0.5 * ay, hh); st.hair.x = Math.max(-0.08, Math.min(0.12, st.hair.x)); }
+  }
+  if (S.pack) S.pack.rotation.x = st.pack.x;
+  if (S.cordL) S.cordL.rotation.set(st.lx.x, 0, st.lz.x); if (S.cordR) S.cordR.rotation.set(st.rx.x, 0, st.rz.x);
+  if (S.hair) { const k = st.hair.x; S.hair.scale.set(1 - 0.15 * k, 1 + k, 1 - 0.15 * k); }
+}
+A.secondary = secondary;
+function flip(r, c) {   // reload: spin the gun a full turn around the grip during the clip's flip window
+  if (!r.hand || !r.hasGun) return; const up = c.g.up.cur, F = up && A.flips[up.name]; let ang = 0;
+  if (F && (!c.g.up.prev || c.g.up.fade > 0.5)) { const k = Math.max(0, Math.min(1, (up.time - F[0]) / (F[1] - F[0]))); ang = easeFade(k) * Math.PI * 2; }
+  r.hand.rotation.x = -(r.aimX || 2.25) + ang;
+}
+const SV = new T.Vector3();
+function rigPos(rig) { rig.lean.getWorldPosition(SV); return SV; }
 /* called from actors.js after the procedural pose: overrides the joints with the clips */
 A.update = function (a, dt) {
   const r = a.rig; if (!r || !r.knees) return; if (r.lod > 1) { lowLod(a, dt); return; }
@@ -249,7 +289,9 @@ A.update = function (a, dt) {
   else if (!c.full) addX(r.head, G.clamp(pit * 0.35, -0.45, 0.45));
   // left hand -> fore-grip of two-handed weapons (2-bone IK), blended in/out by clip
   const upn = c.g.up.cur ? c.g.up.cur.name : '', w1 = c.aim && r.fore && r.held && r.hasGun && r.lod < 2 && upn !== 'reload' && upn !== 'reload_shotgun' && upn !== 'equip' ? 1 : 0;
+  flip(r, c);
   c.ikW = (c.ikW || 0) + (w1 - (c.ikW || 0)) * Math.min(1, dt * 12); if (c.ikW > 0.01 && r.fore) leftIK(a, r, c.ikW);
+  if (r.sec) { const ly = r.lean.position, sy = Math.sin(a.yaw), cy = Math.cos(a.yaw); secondary(r, dt, a.x + ly.x * cy + ly.z * sy, a.y + ly.y, a.z - ly.x * sy + ly.z * cy, a.yaw); }
   if (a.emote || a.victory || (a.state === 'glide') || !a.alive || (c.full && !A.force)) { if (r.held) r.held.visible = !(a.emote || a.victory || a.state === 'glide' || !a.alive || c.full); }
   else if (r.held) r.held.visible = true;
   { const itp = a.inv && a.inv[a.sel]; r.pick.visible = !!(itp && itp.type === 'pickaxe' && !a.buildMode && a.alive && !a.emote && !a.victory && !c.full && a.state !== 'glide'); }
@@ -259,11 +301,11 @@ A.update = function (a, dt) {
 A.lobby = { name: null, t: 0, next: 7, hold: false, until: 0 };
 A.lobbyPlay = function (name, o) { if (!info(name)) return; o = o || {}; const L = A.lobby; L.name = name; L.t = 0; L.hold = !!o.hold; L.until = o.hold ? 1e9 : (o.dur || A.emoteDur(name)); L.restart = true; };
 A.lobbyStop = function () { const L = A.lobby; L.name = null; L.hold = false; L.next = 6 + Math.random() * 4; };
-const LOBBY_IDLES = ['wave', 'shrug', 'flex', 'clap', 'cheer', 'salute', 'bow', 'jacks', 'dance'];
+const LOBBY_IDLES = ['wave', 'shrug', 'flex', 'clap', 'cheer', 'salute', 'bow', 'jacks', 'dance', 'pendulum', 'firedup', 'shuffle', 'callout', 'laugh', 'champ', 'limber'];
 A.updateLobby = function (rig, dt) {
   if (A.legacy) return false; let c = rig._ctl; if (!c) c = rig._ctl = new Ctl(rig); if (!c.ok) return false;
   const L = A.lobby;
-  if (A.preview) { c.set('lo', A.preview.name, { fade: 0, scrub: A.preview.t }); c.set('up', A.preview.name, { fade: 0, scrub: A.preview.t }); rig.pick.visible = /^pickaxe/.test(A.preview.name); c.step(0); if (/^(aim|shoot)_/.test(A.preview.name) && rig.fore && rig.held) leftIK({ os: null }, rig, 1); return true; }
+  if (A.preview) { c.set('lo', A.preview.name, { fade: 0, scrub: A.preview.t }); c.set('up', A.preview.name, { fade: 0, scrub: A.preview.t }); rig.pick.visible = /^pickaxe/.test(A.preview.name); c.step(0); flip(rig, c); if (/^(aim|shoot)_/.test(A.preview.name) && rig.fore && rig.held) leftIK({ os: null }, rig, 1); if (rig.sec) { const p = rigPos(rig); secondary(rig, dt || 1 / 30, p.x, p.y, p.z, rig.root.rotation.y); } return true; }
   if (A.force && info(A.force)) { const inf = info(A.force); if (!L.name) { L.name = A.force; L.hold = true; L.until = 1e9; L.restart = true; } }
   L.t += dt; if (!L.name) { L.next -= dt; if (L.next <= 0) { L.next = 8 + Math.random() * 6; A.lobbyPlay(LOBBY_IDLES[Math.floor(Math.random() * LOBBY_IDLES.length)], { dur: 0 }); const i = info(L.name); L.until = i.loop ? i.dur * 2 : i.dur + 0.2; } }
   else if (L.hold && L.name && info(L.name) && !info(L.name).loop && L.t > info(L.name).dur + 1.0) { L.t = 0; L.restart = true; }   // held one-shot emotes replay
@@ -271,7 +313,7 @@ A.updateLobby = function (rig, dt) {
   const o = { fade: 0.25 }; if (L.restart) { o.restart = true; L.restart = false; }
   if (L.name) { c.set('lo', L.name, o); c.set('up', L.name, Object.assign({}, o)); rig.pick.visible = false; if (rig.held) rig.held.visible = false; }
   else { c.set('lo', 'idle', { fade: 0.35 }); c.set('up', 'pickaxe_idle', { fade: 0.35 }); rig.pick.visible = true; }
-  c.step(dt); addX(rig.head, 0); return true;
+  c.step(dt); addX(rig.head, 0); if (rig.sec) { const p = rigPos(rig); secondary(rig, dt, p.x, p.y, p.z, rig.root.rotation.y); } return true;
 };
 /* debug: pose a rig (any rig with .legs etc.) at an exact time of a clip */
 A.pose = function (rig, name, time) {

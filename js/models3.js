@@ -213,6 +213,10 @@ G.makeCharacter = function (skin) {
   for (let k = 0; k < 3; k++) { const q = new T.Mesh(G.flashGeo || (G.flashGeo = new T.PlaneGeometry(0.5, 0.5)), fm); q.rotation.z = k * Math.PI / 3; flash.add(q); } const core = new T.Mesh(new T.SphereGeometry(0.09, 6, 5), new T.MeshBasicMaterial({ color: 0xffffff, fog: false })); flash.add(core); flash.visible = false; gun.add(flash);
   const glider = G.makeGlider(skin.shirt !== undefined ? skin.shirt : (O.packT === 'cape' || O.top === 0xeaf4ff || O.top === 0xf4f4f4 ? O.top2 : O.top)); glider.visible = false; root.add(glider);
   const o = { root, lean, m, legs, knees, arms, elbows, head, gun, pick, flash, glider, held: null, heldKey: '', hi, low, outlines, lod: 0, outfit: O };
+  if (GG.sec) {   // secondary-motion parts (spring-driven in anim.js): backpack/cape + drawstrings hang off the torso, hair squashes on the head
+    o.sec = {}; for (const k in GG.sec) { const d = GG.sec[k], g = new T.Group(), par = k === 'hair' ? head : hi; g.position.set(d.piv[0], d.piv[1], d.piv[2]); par.add(g);
+      const me = new T.Mesh(d.geo, mat); me.castShadow = k === 'pack'; me.position.set(-d.piv[0], -d.piv[1], -d.piv[2]); g.add(me);
+      const ol = new T.Mesh(d.geo, om); ol.renderOrder = -1; ol.position.copy(me.position); g.add(ol); outlines.push(ol); o.sec[k] = g; } }
   // The held item lives in a "hand" holder parented to the right forearm (so it follows every animation).
   // Its rotation cancels the forearm's aim-pose angle so the weapon points forward when aiming.
   const hand = new T.Group(); hand.position.set(0, -0.36, 0); elbows[1].add(hand); hand.rotation.x = -2.25; hand.add(flash);

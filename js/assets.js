@@ -41,15 +41,15 @@ function bake(items, roles, opts) {
     else for (const gr of g.groups) { const mt = mats[gr.materialIndex]; groups[isGlow(mt) && !opts.glowAsLit ? 'glow' : 'lit'].push({ it, mat: mt, geo: g, start: gr.start, count: gr.count }); } }
   const out = {};
   for (const key of ['lit', 'glow']) { const L = groups[key]; if (!L.length) continue;
-    let nv = 0, ni = 0; for (const e of L) { nv += e.geo.attributes.position.count; ni += e.count; }
+    let nv = 0, ni = 0; for (const e of L) { nv += e.geo.attributes.position.count; ni += e.count; } const ranges = [];
     const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3), idx = new Uint32Array(ni); let vo = 0, io = 0;
     for (const e of L) { const g = e.geo, ps = g.attributes.position, ns = g.attributes.normal, n = ps.count, m = e.it.m; _n3.getNormalMatrix(m);
       const role = roleOf(e.mat); if (role && roles && roles[role] !== undefined) _c.set(roles[role]); else _c.copy(e.mat.color || _c.set(0xffffff));
       for (let i = 0; i < n; i++) { _v.fromBufferAttribute(ps, i).applyMatrix4(m); pos[(vo + i) * 3] = _v.x; pos[(vo + i) * 3 + 1] = _v.y; pos[(vo + i) * 3 + 2] = _v.z;
         if (ns) { _n.fromBufferAttribute(ns, i).applyMatrix3(_n3).normalize(); nor[(vo + i) * 3] = _n.x; nor[(vo + i) * 3 + 1] = _n.y; nor[(vo + i) * 3 + 2] = _n.z; }
         col[(vo + i) * 3] = _c.r; col[(vo + i) * 3 + 1] = _c.g; col[(vo + i) * 3 + 2] = _c.b; }
-      if (g.index) for (let i = e.start; i < e.start + e.count; i++) idx[io++] = g.index.getX(i) + vo; else for (let i = e.start; i < e.start + e.count; i++) idx[io++] = vo + i;
-      vo += n; }
+      const io0 = io; if (g.index) for (let i = e.start; i < e.start + e.count; i++) idx[io++] = g.index.getX(i) + vo; else for (let i = e.start; i < e.start + e.count; i++) idx[io++] = vo + i;
+      const mn = e.it.mesh.name || ''; ranges.push([io0, io, (/^mesh_/.test(mn) && e.it.mesh.parent ? e.it.mesh.parent.name : mn).replace(/\.\d+$/, '')]); vo += n; }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
     geo.setIndex(new T.BufferAttribute(idx.subarray(0, io), 1));
     if (opts.outline) { // averaged normals per welded position -> inverted-hull outline without cracks at hard edges
@@ -57,7 +57,18 @@ function bake(items, roles, opts) {
       for (let i = 0; i < nv; i++) { const k = kf(i); let a = acc.get(k); if (!a) acc.set(k, a = [0, 0, 0]); a[0] += nor[i * 3]; a[1] += nor[i * 3 + 1]; a[2] += nor[i * 3 + 2]; }
       const on = new Float32Array(nv * 3); for (let i = 0; i < nv; i++) { const a = acc.get(kf(i)), l = Math.hypot(a[0], a[1], a[2]) || 1; on[i * 3] = a[0] / l; on[i * 3 + 1] = a[1] / l; on[i * 3 + 2] = a[2] / l; }
       geo.setAttribute('onrm', new T.BufferAttribute(on, 3)); }
-    geo.computeBoundingSphere(); geo.computeBoundingBox(); out[key] = geo; }
+    geo.computeBoundingSphere(); geo.computeBoundingBox(); out[key] = geo;
+    if (opts.tag && key === 'lit') {   // split triangles into extra index-only geometries (sharing the vertex buffers) by opts.tag(meshName, cx, cy, cz) -> 0 (keep) | tag
+      const lists = { 0: [] }; let ri = 0;
+      for (let t = 0; t < io; t += 3) { while (ri < ranges.length - 1 && t >= ranges[ri][1]) ri++; const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+        const tg = opts.tag(ranges[ri][2], (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3, (pos[a * 3 + 1] + pos[b * 3 + 1] + pos[c * 3 + 1]) / 3, (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3) || 0;
+        (lists[tg] || (lists[tg] = [])).push(a, b, c); }
+      if (Object.keys(lists).length > 1) { out.tags = {};
+        for (const k in lists) { const ix = new T.BufferAttribute(Uint32Array.from(lists[k]), 1); if (k === '0') { geo.setIndex(ix); continue; }
+          const g2 = new T.BufferGeometry(); for (const an in geo.attributes) g2.setAttribute(an, geo.attributes[an]); g2.setIndex(ix);
+          const bb = new T.Box3(), v = new T.Vector3(); for (const i of lists[k]) bb.expandByPoint(v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])); g2.boundingBox = bb; g2.boundingSphere = bb.getBoundingSphere(new T.Sphere());
+          out.tags[k] = g2; } } }
+  }
   return out;
 }
 const _I = new T.Matrix4();
@@ -80,12 +91,22 @@ const used = (n) => { A.used[n] = (A.used[n] || 0) + 1; };
 function charGeos(skin, O) {
   const root = A.scenes['char_' + O.id]; if (!root) return null;
   const roles = { skin: skin.tone || 0xf2c9a0, top: skin.shirt !== undefined ? skin.shirt : O.top, top2: skin.acc !== undefined ? skin.acc : O.top2, pants: skin.pants !== undefined ? skin.pants : O.pants, hair: skin.hairC !== undefined ? skin.hairC : (O.hairC || 0x3a2a1a) };
-  const seg = (name) => { const n = find(root, name); if (!n) throw new Error('missing node ' + name); return bake(directMeshes(n), roles, { outline: true, glowAsLit: true }).lit || new T.BufferGeometry(); };
+  const bk = (name, tag) => { const n = find(root, name); if (!n) throw new Error('missing node ' + name); return bake(directMeshes(n), roles, { outline: true, glowAsLit: true, tag }); };
+  const seg = (name) => bk(name).lit || new T.BufferGeometry();
   try {
-    const GG = { torso: seg('torso'), head: seg('head'), uarm: [seg('arm_L'), seg('arm_R')], farm: [seg('forearm_L'), seg('forearm_R')], thigh: [seg('leg_L'), seg('leg_R')], shin: [seg('shin_L'), seg('shin_R')] };
+    // secondary-motion parts are split out of the torso / head meshes: 1 backpack (or cape), 2 / 3 hoodie drawstrings L / R, 4 hair
+    const TB = bk('torso', (n, x, y, z) => { if (n.slice(0, 8) !== 'torso_d_') return 0; const role = n.slice(8);
+      if (role === 'top2' && z < -0.12 && Math.abs(x) > 0.04 && Math.abs(x) < 0.08 && y > 1.24 && y < 1.5) return x < 0 ? 2 : 3;
+      if (role !== 'top' && z > 0.125 && y > 0.6 && y < 1.62) return 1; return 0; });
+    const HB = bk('head', (n, x, y, z) => (n === 'head_hair' || n === 'head_d_hair') && y > 0.09 ? 4 : 0);
+    const GG = { torso: TB.lit, head: HB.lit, uarm: [seg('arm_L'), seg('arm_R')], farm: [seg('forearm_L'), seg('forearm_R')], thigh: [seg('leg_L'), seg('leg_R')], shin: [seg('shin_L'), seg('shin_R')] };
     const lod = find(root, 'lod_low'); // human models ship a decimated far-LOD mesh and use their own pivot widths
     GG.low = bake(lod ? allMeshes(lod, root) : allMeshes(root), roles, { glowAsLit: true }).lit;
     if (lod) GG.piv = { shx: 0.29, hipx: 0.12, human: true };
+    const tg = Object.assign({}, TB.tags || {}, HB.tags || {}), sec = {};
+    for (const [k, nm] of [[1, 'pack'], [2, 'cordL'], [3, 'cordR'], [4, 'hair']]) { const g = tg[k]; if (!g) continue; const b = g.boundingBox, c = b.getCenter(new T.Vector3());
+      sec[nm] = { geo: g, piv: nm === 'hair' ? [0, 0, 0] : nm === 'pack' ? [c.x, b.max.y, b.min.z] : [c.x, b.max.y, c.z] }; }
+    if (Object.keys(sec).length) GG.sec = sec;
     used('char'); return GG;
   } catch (e) { console.warn('char glb ' + O.id + ':', e.message); return null; }
 }
